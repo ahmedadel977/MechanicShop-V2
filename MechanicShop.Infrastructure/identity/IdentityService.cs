@@ -34,7 +34,7 @@ namespace MechanicShop.Infrastructure.identity
             }
 
             return new AppUserDto(user.Id, user.Email!, await _userManager.GetRolesAsync(user), await _userManager.GetClaimsAsync(user));
-            _userManager.
+            
 
         }
 

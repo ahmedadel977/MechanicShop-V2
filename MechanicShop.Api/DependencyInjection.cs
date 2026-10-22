@@ -1,16 +1,20 @@
+using System;
+using System.Text.Json.Serialization;
+using System.Threading.RateLimiting;
 using Asp.Versioning;
 using MechanicShop.Api.Infrastructure;
 using MechanicShop.Api.OpenApi.Transformers;
 using MechanicShop.Api.Services;
 using MechanicShop.Application.Common.Interfaces;
 using MechanicShop.Infrastructure.Settings;
+using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.RateLimiting;
+using Microsoft.Extensions.Configuration;
 using OpenTelemetry.Metrics;
 using OpenTelemetry.Resources;
 using OpenTelemetry.Trace;
 using Serilog;
-using System.Text.Json.Serialization;
-using System.Threading.RateLimiting;
 
 namespace Microsoft.Extensions.DependencyInjection;
 
@@ -54,7 +58,7 @@ public static class DependencyInjection
     {
         services.AddOpenTelemetry()
         .ConfigureResource(res => res.AddService("overservice"))
-        .WithTracing(tracing =>
+        .WithTracing(static tracing =>
         {
             tracing.AddAspNetCoreInstrumentation().
             AddHttpClientInstrumentation();
@@ -66,32 +70,102 @@ public static class DependencyInjection
             metrics.AddAspNetCoreInstrumentation().
             AddHttpClientInstrumentation();
 
-            metrics.AddOtlpExporter().
-            AddPrometheusExporter(); // /metrics
+            metrics.AddOtlpExporter();
+            
         });
 
         return services;
     }
 
-    public static IServiceCollection AddAppRateLimiting(this IServiceCollection services)
+    
+public static IServiceCollection AddAppRateLimiting(
+    this IServiceCollection services)
     {
         services.AddRateLimiter(options =>
         {
-            options.AddSlidingWindowLimiter("SlidingWindow", limiterOptions =>
-            {
-                limiterOptions.PermitLimit = 100;
-                limiterOptions.Window = TimeSpan.FromMinutes(1);
-                limiterOptions.SegmentsPerWindow = 6;
-                limiterOptions.QueueLimit = 10;
-                limiterOptions.QueueProcessingOrder = QueueProcessingOrder.OldestFirst;
-                limiterOptions.AutoReplenishment = true;
-            });
+            // 1. Global Sliding Window + Concurrency
+            options.GlobalLimiter =
+                PartitionedRateLimiter.CreateChained(
+                    PartitionedRateLimiter.Create<HttpContext, string>(
+                        httpContext =>
+                            RateLimitPartition.GetSlidingWindowLimiter(
+                                partitionKey:
+                                    httpContext.Connection.RemoteIpAddress?.ToString()
+                                    ?? "unknown",
+                                factory: _ => new SlidingWindowRateLimiterOptions
+                                {
+                                    PermitLimit = 100,
+                                    Window = TimeSpan.FromMinutes(1),
+                                    SegmentsPerWindow = 6,
+                                    QueueLimit = 0,
+                                    AutoReplenishment = true
+                                })),
 
-            options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+                    PartitionedRateLimiter.Create<HttpContext, string>(
+                        _ => RateLimitPartition.GetConcurrencyLimiter(
+                            partitionKey: "GlobalConcurrency",
+                            factory: _ => new ConcurrencyLimiterOptions
+                            {
+                                PermitLimit = 50,
+                                QueueLimit = 0,
+                                QueueProcessingOrder =
+                                    QueueProcessingOrder.OldestFirst
+                            }))
+                );
+
+            // 2. Login-specific rate limit
+            options.AddPolicy("LoginPolicy", httpContext =>
+                RateLimitPartition.GetFixedWindowLimiter(
+                    partitionKey:
+                        httpContext.Connection.RemoteIpAddress?.ToString()
+                        ?? "unknown",
+                    factory: _ => new FixedWindowRateLimiterOptions
+                    {
+                        PermitLimit = 5,
+                        Window = TimeSpan.FromMinutes(1),
+                        QueueLimit = 0,
+                        AutoReplenishment = true
+                    }));
+
+            // 3. General authenticated-user policy
+            options.AddPolicy("ApiUserPolicy", httpContext =>
+                RateLimitPartition.GetFixedWindowLimiter(
+                    partitionKey:
+                        httpContext.User.Identity?.Name
+                        ?? httpContext.Connection.RemoteIpAddress?.ToString()
+                        ?? "anonymous",
+                    factory: _ => new FixedWindowRateLimiterOptions
+                    {
+                        PermitLimit = 5,
+                        Window = TimeSpan.FromMinutes(1),
+                        QueueLimit = 0,
+                        AutoReplenishment = true
+                    }));
+
+            options.RejectionStatusCode =
+                StatusCodes.Status429TooManyRequests;
+
+            //
+            // 2.Register specific rate limit
+            options.AddPolicy("RegisterPolicy", httpContext =>
+    RateLimitPartition.GetFixedWindowLimiter(
+        partitionKey:
+            httpContext.Connection.RemoteIpAddress?.ToString()
+            ?? "unknown",
+        factory: _ => new FixedWindowRateLimiterOptions
+        {
+            PermitLimit = 3,
+            Window = TimeSpan.FromMinutes(1),
+            QueueLimit = 0,
+            AutoReplenishment = true
+        }));
         });
+           
+
 
         return services;
     }
+
 
     public static IServiceCollection AddCustomProblemDetails(this IServiceCollection services)
     {
@@ -209,11 +283,14 @@ public static class DependencyInjection
         // 7. Authentication (must come before authorization)
         app.UseAuthentication();
 
+        app.UseRateLimiter();
+
         // 8. Authorization (must come after authentication)
         app.UseAuthorization();
 
         // 9. Output caching (after auth to cache based on user context)
         app.UseOutputCache();
+     
 
         return app;
     }

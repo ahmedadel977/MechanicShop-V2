@@ -1,6 +1,7 @@
 ﻿using System.ComponentModel.DataAnnotations;
 
 using MechanicShop.Contracts.Common;
+using MechanicShop.Contracts.Requests.Customers;
 
 namespace MechanicShop.Contracts.Requests.RepairTasks;
 
