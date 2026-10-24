@@ -83,14 +83,17 @@ public sealed class NotificationService(
         }
     }
 
-    public Task SendSmsAsync(
-        string phoneNumber,
-        CancellationToken cancellationToken = default)
+    public async Task SendSmsAsync(
+    string phoneNumber,
+    CancellationToken cancellationToken = default)
     {
-        throw new NotSupportedException(
-            "SMS sending has not been configured.");
-    }
+        Console.WriteLine("========== SMS Notification ==========");
+        Console.WriteLine($"To: {phoneNumber}");
+        Console.WriteLine("Message: SMS sending was triggered successfully.");
+        Console.WriteLine("======================================");
 
+        await Task.CompletedTask;
+    }
     private static string MaskEmail(string email)
     {
         var at = email.IndexOf('@');

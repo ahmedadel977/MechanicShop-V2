@@ -9,6 +9,7 @@ using MechanicShop.Domain.Workorders;
 using MediatR;
 
 using Microsoft.EntityFrameworkCore;
+using System.ComponentModel;
 
 namespace MechanicShop.Application.Features.WorkOrders.Queries.GetWorkOrders;
 
@@ -27,16 +28,17 @@ public class GetWorkOrdersQueryHandler(IAppDbContext context)
                 .ThenInclude(rt => rt.Parts)
             .Include(a => a.Invoice)
             .AsQueryable();
-
         workOrdersQuery = ApplyFilters(workOrdersQuery, query);
-
         if (!string.IsNullOrWhiteSpace(query.SearchTerm))
-        {
-            workOrdersQuery = ApplySearchTerm(workOrdersQuery, query.SearchTerm);
+            {
+             workOrdersQuery = ApplySearchTerm(workOrdersQuery, query.SearchTerm);
         }
 
-        workOrdersQuery = ApplySorting(workOrdersQuery, query.SortColumn, query.SortDirection);
 
+        
+
+        workOrdersQuery = ApplySorting(workOrdersQuery, query.SortColumn, query.SortDirection);
+       
         var count = await workOrdersQuery.CountAsync(cancellationToken: ct);
 
         var items = await workOrdersQuery

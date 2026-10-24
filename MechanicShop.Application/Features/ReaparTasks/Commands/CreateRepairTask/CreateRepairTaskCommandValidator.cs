@@ -8,17 +8,20 @@ namespace MechanicShop.Application.Features.ReaparTasks.Commands.CreateRepairTas
         {
             RuleFor(x => x.Name)
                 .NotEmpty().WithMessage("Name is required.")
-                .MaximumLength(100).WithMessage("Name cannot exceed 100 characters.");
+                .MaximumLength(100);
+
             RuleFor(x => x.LaborCost)
-                .GreaterThanOrEqualTo(0).WithMessage("Labor cost must be greater than or equal to 0.");
+                .GreaterThan(0).WithMessage("Labor cost must be greater than 0.");
+
+            RuleFor(x => x.EstimatedDurationInMins)
+                .NotNull().WithMessage("Estimated duration is required.")
+                .IsInEnum();
+
             RuleFor(x => x.Parts)
                 .NotNull().WithMessage("Parts list cannot be null.")
-                .Must(parts => parts.Count > 0).WithMessage("Parts list must contain at least one part.");
-            RuleForEach(x => x.Parts)
-                .SetValidator(new CreateRepairTaskPartCommandValidator());
+                .Must(p => p.Count > 0).WithMessage("At least one part is required.");
 
-            RuleFor(x => x.EstimatedDurationInMin)
-                .IsInEnum().WithMessage("Estimated duration must be a valid enum value.");
+            RuleForEach(x => x.Parts).SetValidator(new CreateRepairTaskPartCommandValidator());
         }
     }
 }

@@ -8,11 +8,11 @@ using System.Text;
 
 namespace MechanicShop.Application.Features.ReaparTasks.Commands.CreateRepairTask
 {
-   public sealed record CreateRepairTaskCommand (
-       string Name,
-       decimal LaborCost,
-         List<CreateRepairTaskPartCommand> Parts,
-         RepairDurationInMinutes? EstimatedDurationInMin
-       ): IRequest<Result<RepairTaskDto>>;
+    public sealed record CreateRepairTaskCommand(
+      string? Name,
+      decimal LaborCost,
+      RepairDurationInMinutes? EstimatedDurationInMins,
+      List<CreateRepairTaskPartCommand> Parts
+  ) : IRequest<Result<RepairTaskDto>>;
 }
 
