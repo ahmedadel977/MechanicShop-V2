@@ -1,4 +1,4 @@
-﻿using Asp.Versioning;
+﻿ using Asp.Versioning;
 
 using MechanicShop.Contracts.Responses;
 using MechanicShop.Infrastructure.Settings;

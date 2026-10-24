@@ -13,11 +13,9 @@ using MechanicShop.Domain.Customers.Vehicles;
 using MechanicShop.Domain.Identity;
 using MediatR;
 using Microsoft.AspNetCore.Authorization;
-using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.OutputCaching;
-
-[Microsoft.AspNetCore.Components.Route("api/v{version:apiVersion}/customers")]
+[Route("api/v{version:apiVersion}/customers")]
 [ApiVersion("1.0")]
 [Authorize]
 public sealed class CustomersController(ISender sender):ApiController
@@ -29,7 +27,7 @@ public sealed class CustomersController(ISender sender):ApiController
     [EndpointDescription("Returns all customers associated with the current user.")]
     [EndpointName("GetCustomers")]
     [MapToApiVersion("1.0")]
-    [ProducesDefaultResponseType]
+    
     [OutputCache(Duration = 60)]
     public async Task <IActionResult> Get(CancellationToken ct)
     {
