@@ -67,7 +67,7 @@ public class UnhandledExceptionBehaviourTests
                 It.IsAny<EventId>(),
                 It.Is<It.IsAnyType>(
                     (state, type) =>
-                        state.ToString()!.Contains("Unhandled Exception")),
+                        state != null && state.ToString()!.Contains("Unhandled Exception")),
                 exception,
                 It.IsAny<Func<It.IsAnyType, Exception?, string>>()),
             Times.Once);

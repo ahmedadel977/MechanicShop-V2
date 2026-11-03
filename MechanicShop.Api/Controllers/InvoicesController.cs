@@ -70,7 +70,7 @@ public sealed class InvoicesController(ISender sender) : ApiController
     {
         var result = await sender.Send(new GetInvoicePdfQuery(invoiceId));
         return result.Match(
-            response => File(response.Content, "application/pdf", response.FileName),
+            response => File(response.Content, response.ContentType, response.FileName),
             Problem
             );
     }

@@ -1,7 +1,9 @@
 using System.Net;
 using System.Net.Http.Json;
 
+using MechanicShop.Application.Common.Interfaces;
 using MechanicShop.Api.IntegrationTests.Common;
+using Microsoft.Extensions.DependencyInjection;
 using Xunit;
 using MechanicShop.Tests.Common.Security;
 
@@ -11,6 +13,17 @@ namespace MechanicShop.Api.IntegrationTests.Controllers;
 public class IdentityControllerTests(WebAppFactory webAppFactory)
 {
     private readonly AppHttpClient _client = webAppFactory.CreateAppHttpClient();
+
+    [Fact]
+    public async Task Authorize_WhenPolicyNameIsNull_ShouldDenyAccess()
+    {
+        using var scope = webAppFactory.CreateScope();
+        var identityService = scope.ServiceProvider.GetRequiredService<IIdentityService>();
+
+        var authorized = await identityService.AuthorizeAsync(TestUsers.Manager.Id, null);
+
+        Assert.False(authorized);
+    }
 
 [Fact]
     public async Task GetCurrentUserClaims_WhenAuthenticated_ShouldReturnManagerIdentity()

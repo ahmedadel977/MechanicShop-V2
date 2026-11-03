@@ -306,8 +306,8 @@ public class CustomersControllerTests : IDisposable
             new UpdateCustomerRequest
             {
                 Name = "Unauthorized update",
-                PhoneNumber = customer.PhoneNumber,
-                Email = customer.Email,
+                PhoneNumber = "+201234567890",
+                Email = $"denied-{suffix[..8]}@example.test",
                 Vehicles = []
             },
             TestContext.Current.CancellationToken);

@@ -13,7 +13,7 @@ namespace MechanicShop.Application.Features.Dashbord.Queris.GetWOkorderstats
         {
             var startsOfDay = request.Date.ToDateTime(TimeOnly.MinValue, DateTimeKind.Utc);
             var endOfDay = request.Date.AddDays(1).ToDateTime(TimeOnly.MinValue, DateTimeKind.Utc);
-            var query = context.WorkOrders.Include(x => x.Vehicle).ThenInclude(x => x.Customer)
+            var query = context.WorkOrders.Include(x => x.Vehicle!).ThenInclude(x => x!.Customer)
                 .Include(x => x.RepairTasks).ThenInclude(x => x.Parts)
                 .Include(x => x.Invoice)
                 .Where(x => x.StartAtUtc >= startsOfDay && x.StartAtUtc < endOfDay);
@@ -64,7 +64,11 @@ namespace MechanicShop.Application.Features.Dashbord.Queris.GetWOkorderstats
             var totalPartsCost = await query.AsNoTracking().SumAsync(x => x.RepairTasks.Sum(y => y.Parts.Sum(z => z.Cost)), cancellationToken);
             var totalLaborCost = await query.AsNoTracking().SumAsync(x => x.RepairTasks.Sum(y => y.LaborCost), cancellationToken);
             var uniqueVehicles = await query.AsNoTracking().Select(x => x.VehicleId).Distinct().CountAsync(cancellationToken);
-            var uniqueCustomers = await query.AsNoTracking().Select(x => x.Vehicle.CustomerId).Distinct().CountAsync(cancellationToken);
+            var uniqueCustomers = await query.AsNoTracking()
+                .Where(x => x.Vehicle != null)
+                .Select(x => x.Vehicle!.CustomerId)
+                .Distinct()
+                .CountAsync(cancellationToken);
             var netProfit = totalRevenue - totalPartsCost - totalLaborCost;
 
             var dto = new TodayWorkOrderStatsDto

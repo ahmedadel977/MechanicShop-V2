@@ -104,8 +104,9 @@
 
 		<PackageReference Include="Serilog.Sinks.Seq" Version="9.1.0" />
 
-		<!-- Added to address security advisory: promote transitive System.Security.Cryptography.Xml to a non-vulnerable version -->
-		<PackageReference Include="System.Security.Cryptography.Xml" Version="9.0.18" />
+		<PackageReference Include="System.Security.Cryptography.Pkcs" Version="10.0.13" />
+
+		<PackageReference Include="System.Security.Cryptography.Xml" Version="9.0.21" />
 
 	</ItemGroup>
 

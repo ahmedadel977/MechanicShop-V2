@@ -18,7 +18,7 @@ public class GenerateTokenQueryhandler (IIdentityService identityService, IToken
       var userResponse  = await  _identityService.AuthenticateAsync(context.Email, context.Password);
         if (userResponse.IsError)
         {
-            _logger.LogWarning("Authentication failed for user {Email}. Errors: {Errors}", context.Email);
+            _logger.LogWarning("Authentication failed for user {Email}. Errors: {Errors}", context.Email, userResponse.Errors);
             return userResponse.Errors;
         }
 

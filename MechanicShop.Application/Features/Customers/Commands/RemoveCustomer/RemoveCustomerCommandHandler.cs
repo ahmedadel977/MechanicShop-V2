@@ -26,9 +26,8 @@ public class RemoveCustomerCommandHandler(ILogger<RemoveCustomerCommandHandler> 
             _logger.LogWarning("Customer with ID {CustomerId} not found.", request.CustomerId);
             return ApplicationErrors.CustomerNotFound;
         }
-        var hasAssociatedWorkOrders = await _context.WorkOrders.Include (w=>w.Vehicle).
-            Where (w=>w.Vehicle!= null).
-            AnyAsync(w=>w.Vehicle.CustomerId == request.CustomerId, cancellationToken);
+        var hasAssociatedWorkOrders = await _context.WorkOrders
+            .AnyAsync(w => w.Vehicle != null && w.Vehicle.CustomerId == request.CustomerId, cancellationToken);
         if (hasAssociatedWorkOrders)
         {
             _logger.LogWarning("Customer with ID {CustomerId} has associated work orders.", request.CustomerId);

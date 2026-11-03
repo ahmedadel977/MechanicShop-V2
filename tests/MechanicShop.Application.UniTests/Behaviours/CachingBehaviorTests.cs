@@ -71,8 +71,6 @@ public class CachingBehaviorTests
         string? actualKey = null;
         Result<string>? actualValue = null;
         HybridCacheEntryOptions? actualOptions = null;
-        IEnumerable<string>? actualTags = null;
-
         _cacheMock
             .Setup(x => x.SetAsync(
                 It.IsAny<string>(),

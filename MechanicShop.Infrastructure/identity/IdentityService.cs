@@ -38,8 +38,13 @@ namespace MechanicShop.Infrastructure.identity
 
         }
 
-        public async Task<bool> AuthorizeAsync(string userId, string? policyName) // This method checks if a user is authorized based on a specific policy
+        public async Task<bool> AuthorizeAsync(string userId, string? policyName)
         {
+            if (string.IsNullOrWhiteSpace(policyName))
+            {
+                return false;
+            }
+
            var user = await _userManager.FindByIdAsync(userId);
             if 
                 (user == null)
