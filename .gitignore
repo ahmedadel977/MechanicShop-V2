@@ -154,6 +154,8 @@ _TeamCity*
 coverage*.json
 coverage*.xml
 coverage*.info
+/CodeCovArtifacts/
+/MechanicShop-Feature-Test-Coverage.md
 
 # Visual Studio code coverage results
 *.coverage
