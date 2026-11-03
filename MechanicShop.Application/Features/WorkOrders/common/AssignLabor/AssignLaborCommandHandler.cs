@@ -1,6 +1,7 @@
 using MechanicShop.Application.Common.Errors;
 using MechanicShop.Application.Common.Interfaces;
 using MechanicShop.Domain.Common.Results;
+using MechanicShop.Domain.Workorders.Events;
 
 using MediatR;
 
@@ -60,6 +61,7 @@ public class AssignLaborCommandHandler(
             return updateLaborResult.Errors;
         }
 
+        workOrder.AddDomainEvent(new WorkOrderCollectionModified());
         await _context.SaveChangesAsync(ct);
 
         await _cache.RemoveByTagAsync("work-order", ct);

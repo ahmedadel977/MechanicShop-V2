@@ -327,7 +327,7 @@ namespace MechanicShop.Infrastructure.Migrations
                     b.Property<DateTimeOffset>("EndAtUtc")
                         .HasColumnType("datetimeoffset");
 
-                    b.Property<Guid>("LaborId")
+                    b.Property<Guid?>("LaborId")
                         .HasColumnType("uniqueidentifier");
 
                     b.Property<string>("LastModifiedBy")
@@ -648,7 +648,7 @@ namespace MechanicShop.Infrastructure.Migrations
                         .WithMany()
                         .HasForeignKey("LaborId")
                         .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
+                        .IsRequired(false);
 
                     b.HasOne("MechanicShop.Domain.Customers.Vehicles.Vehicle", "Vehicle")
                         .WithMany()

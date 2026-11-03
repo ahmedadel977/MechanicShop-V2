@@ -20,7 +20,7 @@ public static class WorkOrderMapper
             EndAtUtc = entity.EndAtUtc,
             Labor = entity.Labor is null ? null : new LaborDto
             {
-                LaborId = entity.LaborId,
+                LaborId = entity.LaborId!.Value,
                 Name = $"{entity.Labor.FirstName} {entity.Labor.LastName}"
             },
             RepairTasks = entity.RepairTasks.ToDtos(),

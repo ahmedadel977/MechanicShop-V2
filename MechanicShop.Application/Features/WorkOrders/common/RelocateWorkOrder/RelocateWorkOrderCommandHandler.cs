@@ -57,7 +57,7 @@ public class RelocateWorkOrderCommandHandler(
             return checkSpotAvailabilityResult.Errors;
         }
 
-        if (await _appointmentValidator.IsLaborOccupied(workOrder.LaborId, command.WorkOrderId, command.NewStartAt, endAt))
+        if (workOrder.LaborId.HasValue && await _appointmentValidator.IsLaborOccupied(workOrder.LaborId.Value, command.WorkOrderId, command.NewStartAt, endAt))
         {
             _logger.LogError("Labor with Id '{LaborId}' is already occupied during the requested time.", workOrder.LaborId);
 
@@ -82,18 +82,16 @@ public class RelocateWorkOrderCommandHandler(
 
         var updateSpotResult = workOrder.UpdateSpot(command.NewSpot);
 
-        if (updateTimingResult.IsError)
+        if (updateSpotResult.IsError)
         {
             _logger.LogError("Failed to update Spot: {Error}", updateSpotResult.TopError.Description);
 
-            return updateTimingResult.Errors;
+            return updateSpotResult.Errors;
         }
 
         workOrder.AddDomainEvent(new WorkOrderCollectionModified());
 
         await _context.SaveChangesAsync(ct);
-
-        workOrder.AddDomainEvent(new WorkOrderCollectionModified());
 
         await _cache.RemoveByTagAsync("work-order", ct);
 

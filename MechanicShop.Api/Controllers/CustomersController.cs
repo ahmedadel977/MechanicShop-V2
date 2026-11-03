@@ -86,7 +86,7 @@ public sealed class CustomersController(ISender sender):ApiController
     }
     [HttpPut("{customerId:guid}")]
     [Authorize(Roles = nameof(Role.Manager))]
-    [ProducesResponseType(typeof(CustomerDto), StatusCodes.Status204NoContent)]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType(typeof(ValidationProblemDetails), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status500InternalServerError)]
@@ -109,7 +109,7 @@ public sealed class CustomersController(ISender sender):ApiController
         var result = await sender.Send(command, ct);
 
         return result.Match(
-            response => Ok(response),
+            _ => NoContent(),
             Problem);
     }
 

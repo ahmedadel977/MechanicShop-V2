@@ -48,6 +48,13 @@ namespace MechanicShop.Domain.Billing.Command.IssueInvoice
                 return ApplicationErrors.WorkOrderMustBeCompletedForInvoicing;
             }
 
+            if (await _context.Invoices.AnyAsync(
+                    invoice => invoice.WorkOrderId == workOrder.Id,
+                    cancellationToken))
+            {
+                return ApplicationErrors.InvoiceAlreadyIssued;
+            }
+
             Guid invoiceId = Guid.NewGuid();
 
             var lineItems = new List<InvoiceLineItem>();

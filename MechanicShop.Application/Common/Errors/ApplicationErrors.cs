@@ -23,6 +23,11 @@ public static class ApplicationErrors
            "ApplicationErrors.Customer.NotFound",
            "Customer does not exist.");
 
+    public static Error CustomerVehicleOwnershipInvalid =>
+    Error.Conflict(
+           "Customer.Vehicle.Ownership.Invalid",
+           "A vehicle cannot be assigned to a different customer.");
+
     public static Error VehicleNotFound =>
     Error.NotFound(
            "ApplicationErrors.Vehicle.NotFound",
@@ -42,6 +47,11 @@ public static class ApplicationErrors
     Error.Conflict(
             "WorkOrder.InvoiceIssuance.InvalidState",
             "WorkOrder must be in 'Completed' state to issue an invoice.");
+
+    public static Error InvoiceAlreadyIssued =>
+    Error.Conflict(
+            "Invoice.AlreadyIssued",
+            "An invoice has already been issued for this WorkOrder.");
 
     public static Error InvoiceNotFound => Error.NotFound(
        "ApplicationErrors.Invoice.NotFound",

@@ -76,9 +76,11 @@ public class CreateWorkOrderCommandHandler(
             return ApplicationErrors.VehicleNotFound;
         }
 
-        var labor = await _context.Employees.FindAsync([command.LaborId], cancellationToken);
+        var labor = command.LaborId.HasValue
+            ? await _context.Employees.FindAsync([command.LaborId.Value], cancellationToken)
+            : null;
 
-        if (labor is null)
+        if (command.LaborId.HasValue && labor is null)
         {
             _logger.LogError("Invalid LaborId: {LaborId}", command.LaborId.ToString());
             return ApplicationErrors.LaborNotFound;
@@ -101,13 +103,13 @@ public class CreateWorkOrderCommandHandler(
                 description: "The vehicle already has an overlapping WorkOrder.");
         }
 
-        var isLaborOccupied = await _context.WorkOrders
+        var isLaborOccupied = command.LaborId.HasValue && await _context.WorkOrders
             .AnyAsync(
                 a =>
-                a.LaborId == command.LaborId &&
+                a.LaborId == command.LaborId.Value &&
                 a.StartAtUtc < endAt &&
-                a.EndAtUtc > command.StartAt
-                );
+                a.EndAtUtc > command.StartAt,
+                cancellationToken);
 
         if (isLaborOccupied)
         {
@@ -121,7 +123,7 @@ public class CreateWorkOrderCommandHandler(
            command.VehicleId,
            command.StartAt,
            endAt,
-           command.LaborId!.Value,
+           command.LaborId,
            command.Spot,
            repairTasks);
         if (createWorkOrderResult.IsError)

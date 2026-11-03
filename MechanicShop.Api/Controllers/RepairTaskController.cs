@@ -5,6 +5,7 @@ using MechanicShop.Application.Features.RepairTasks.Commands.RemoveRepairTask;
 using MechanicShop.Application.Features.RepairTasks.Commands.UpdateRepairTask;
 using MechanicShop.Application.Features.RepairTasks.Dtos;
 using MechanicShop.Application.Features.RepairTasks.Queries.GetRepairTasks;
+using MechanicShop.Application.Features.ReaparTasks.Queries.GerReapairTaskByid;
 using MechanicShop.Contracts.Common;
 using MechanicShop.Contracts.Requests.RepairTasks;
 using MechanicShop.Domain.Identity;
@@ -53,7 +54,7 @@ namespace MechanicShop.Api.Controllers
         [OutputCache(Duration = 60)]
         public async Task<IActionResult> GetById ( Guid repairTaskId , CancellationToken ct)
         {
-            var result = await sender.Send(new GetRepairTasksQuery(), ct);
+            var result = await sender.Send(new GetRepairTaskByIdQuery(repairTaskId), ct);
             return result.Match(
                 response => Ok(response),
                 Problem

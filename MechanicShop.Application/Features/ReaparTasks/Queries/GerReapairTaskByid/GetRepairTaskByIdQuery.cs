@@ -11,9 +11,9 @@ namespace MechanicShop.Application.Features.ReaparTasks.Queries.GerReapairTaskBy
     {
         public string CacheKey => $"repair-task-{RepairTaskId}";
 
-        public string[] Tags => throw new NotImplementedException();
+        public string[] Tags => ["repair-task"];
 
-        public TimeSpan Expiration => throw new NotImplementedException();
+        public TimeSpan Expiration => TimeSpan.FromMinutes(10);
     }
 }
 

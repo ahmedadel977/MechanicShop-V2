@@ -78,7 +78,7 @@ public class GetDailyScheduleQueryHandler(
                             StartAt = wo.StartAtUtc,
                             EndAt = wo.EndAtUtc,
                             Vehicle = FormatVehicleInfo(wo.Vehicle!),
-                            Labor = wo.Labor!.ToDto(),
+                            Labor = wo.Labor?.ToDto(),
                             IsOccupied = true,
                             RepairTasks = [.. wo.RepairTasks.ToList().ConvertAll(rt => rt.ToDto())],
                             WorkOrderLocked = !wo.IsEditable,

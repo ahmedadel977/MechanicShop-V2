@@ -53,7 +53,12 @@ namespace MechanicShop.Infrastructure.identity
 
         public async Task<Result<AppUserDto>> GetUserByIdAsync(string userId)
         {
-            var user = await _userManager.FindByIdAsync(userId) ?? throw new InvalidOperationException(nameof(userId));
+            var user = await _userManager.FindByIdAsync(userId);
+
+            if (user is null)
+            {
+                return Error.NotFound("Auth.User.NotFound", "User not found.");
+            }
 
             var roles = await _userManager.GetRolesAsync(user);
 

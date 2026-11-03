@@ -12,9 +12,9 @@ public class WorkOrderConfiguration : IEntityTypeConfiguration<WorkOrder>
         builder.HasKey(w => w.Id).IsClustered(false);
 
         builder.Property(w => w.LaborId)
-               .IsRequired();
+               .IsRequired(false);
 
-        builder.HasOne(w => w.Labor).WithMany().HasForeignKey(w => w.LaborId).IsRequired();
+        builder.HasOne(w => w.Labor).WithMany().HasForeignKey(w => w.LaborId).IsRequired(false);
 
         builder.HasOne(i => i.Invoice)
             .WithOne(w => w.WorkOrder)

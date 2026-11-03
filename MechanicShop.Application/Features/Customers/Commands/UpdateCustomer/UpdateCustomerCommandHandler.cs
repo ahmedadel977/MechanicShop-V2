@@ -38,6 +38,18 @@ public class UpdateCustomerCommandHandler(
             return ApplicationErrors.CustomerNotFound;
         }
 
+        var requestedVehicleIds = command.Vehicles
+            .Where(vehicle => vehicle.VehicleId.HasValue)
+            .Select(vehicle => vehicle.VehicleId!.Value)
+            .Distinct()
+            .ToArray();
+        if (requestedVehicleIds.Length > 0 && await _context.Vehicles.AnyAsync(
+                vehicle => requestedVehicleIds.Contains(vehicle.Id) && vehicle.CustomerId != customer.Id,
+                ct))
+        {
+            return ApplicationErrors.CustomerVehicleOwnershipInvalid;
+        }
+
         var validatedVehicles = new List<Vehicle>();
 
         foreach (var v in command.Vehicles)

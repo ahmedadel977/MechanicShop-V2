@@ -73,7 +73,7 @@ public class UpdateWorkOrderRepairTasksCommandHandler(
             return spotCheckResult.Errors;
         }
 
-        if (await workOrderValidator.IsLaborOccupied(workOrder.LaborId, workOrder.Id, workOrder.StartAtUtc, newEndAt))
+        if (workOrder.LaborId.HasValue && await workOrderValidator.IsLaborOccupied(workOrder.LaborId.Value, workOrder.Id, workOrder.StartAtUtc, newEndAt))
         {
             return ApplicationErrors.LaborOccupied;
         }

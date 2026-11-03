@@ -47,9 +47,8 @@ public class DeleteWorkOrderCommandHandler(
 
         _context.WorkOrders.Remove(workOrder);
 
-        await _context.SaveChangesAsync(ct);
-
         workOrder.AddDomainEvent(new WorkOrderCollectionModified());
+        await _context.SaveChangesAsync(ct);
 
         await _cache.RemoveByTagAsync("work-order", ct);
 

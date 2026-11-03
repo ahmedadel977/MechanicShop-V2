@@ -16,7 +16,12 @@ public class GetUserByIdQueryHanlder(ILogger<GetUserByIdQueryHanlder> logger, II
 
     public async Task<Result<AppUserDto>> Handle(GetUserByIdQuery request, CancellationToken ct)
     {
-        var getUserByIdResult = await _identityService.GetUserByIdAsync(request.UserId!);
+        if (string.IsNullOrWhiteSpace(request.UserId))
+        {
+            return Error.Validation("Auth.UserId.Invalid", "UserId is required.");
+        }
+
+        var getUserByIdResult = await _identityService.GetUserByIdAsync(request.UserId);
 
         if (getUserByIdResult.IsError)
         {

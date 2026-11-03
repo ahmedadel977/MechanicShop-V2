@@ -13,7 +13,7 @@ public sealed class WorkOrder : AuditableEntity
     public Guid VehicleId { get; }
     public DateTimeOffset StartAtUtc { get; private set; }
     public DateTimeOffset EndAtUtc { get; private set; }
-    public Guid LaborId { get; private set; }
+    public Guid? LaborId { get; private set; }
     public Spot Spot { get; private set; }
     public WorkOrderState State { get; private set; }
     public Employee? Labor { get; set; }
@@ -31,7 +31,7 @@ public sealed class WorkOrder : AuditableEntity
     private WorkOrder()
     { }
 
-    private WorkOrder(Guid id, Guid vehicleId, DateTimeOffset startAt, DateTimeOffset endAt, Guid laborId, Spot spot, WorkOrderState state, List<RepairTask> repairTasks)
+    private WorkOrder(Guid id, Guid vehicleId, DateTimeOffset startAt, DateTimeOffset endAt, Guid? laborId, Spot spot, WorkOrderState state, List<RepairTask> repairTasks)
         : base(id)
     {
         VehicleId = vehicleId;
@@ -43,7 +43,7 @@ public sealed class WorkOrder : AuditableEntity
         _repairTasks = repairTasks;
     }
 
-    public static Result<WorkOrder> Create(Guid id, Guid vehicleId, DateTimeOffset startAt, DateTimeOffset endAt, Guid laborId, Spot spot, List<RepairTask> repairTasks)
+    public static Result<WorkOrder> Create(Guid id, Guid vehicleId, DateTimeOffset startAt, DateTimeOffset endAt, Guid? laborId, Spot spot, List<RepairTask> repairTasks)
     {
         if (id == Guid.Empty)
         {

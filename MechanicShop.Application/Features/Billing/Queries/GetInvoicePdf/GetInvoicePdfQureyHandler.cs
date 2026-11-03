@@ -20,6 +20,9 @@ public class GetInvoicePdfQureyHandler(
     {
         var invoice = await context.Invoices.AsNoTracking()
            .Include(i => i.LineItems)
+           .Include(i => i.WorkOrder!)
+               .ThenInclude(workOrder => workOrder.Vehicle!)
+                   .ThenInclude(vehicle => vehicle.Customer)
            .FirstOrDefaultAsync(i => i.Id == query.InvoiceId, ct);
 
         if (invoice is null)

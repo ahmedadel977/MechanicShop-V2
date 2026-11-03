@@ -7,5 +7,11 @@
     <Project Path="MechanicShop.Domain/MechanicShop.Domain.csproj" />
     <Project Path="MechanicShop.Infrastructure/MechanicShop.Infrastructure.csproj" />
   </Folder>
-  <Folder Name="/tests/" />
+  <Folder Name="/tests/">
+    <Project Path="tests/MechanicShop.Api.IntegrationTests/MechanicShop.Api.IntegrationTests.csproj" />
+    <Project Path="tests/MechanicShop.Application.SubcutaneiousTests/MechanicShop.Application.SubcutaneiousTests.csproj" />
+    <Project Path="tests/MechanicShop.Application.UniTests/MechanicShop.Application.UniTests.csproj" />
+    <Project Path="tests/MechanicShop.Domain.UniTests/MechanicShop.Domain.UniTests.csproj" />
+    <Project Path="tests/MechanicShop.Tests.Common/MechanicShop.Tests.Common.csproj" />
+  </Folder>
 </Solution>

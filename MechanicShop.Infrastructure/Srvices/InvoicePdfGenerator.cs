@@ -1,6 +1,8 @@
-﻿using MechanicShop.Application.Common.Interfaces;
+using MechanicShop.Application.Common.Interfaces;
 using MechanicShop.Domain.Workorders.Billing;
+using System.Globalization;
 
+using QuestPDF.Drawing;
 using QuestPDF.Fluent;
 using QuestPDF.Helpers;
 using QuestPDF.Infrastructure;
@@ -9,6 +11,19 @@ namespace MechanicShop.Infrastructure.Services;
 
 public sealed class InvoicePdfGenerator : IInvoicePdfGenerator
 {
+    private const string ArabicFontFamily = "Noto Naskh Arabic";
+    private const string ArabicFontResource = "MechanicShop.Infrastructure.Assets.Fonts.NotoNaskhArabic-Variable.ttf";
+    private const string WrenchIconSvg = "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 48 48\"><path fill=\"#FFFFFF\" d=\"M44 8.5a15 15 0 0 1-19.7 19.7L12.1 40.4a5 5 0 0 1-7.1-7.1l12.2-12.2A15 15 0 0 1 36.9 1.4l-9 9 9.7 9.7 9-9A15 15 0 0 1 44 8.5Z\"/></svg>";
+
+    static InvoicePdfGenerator()
+    {
+        using var fontStream = typeof(InvoicePdfGenerator).Assembly
+            .GetManifestResourceStream(ArabicFontResource)
+            ?? throw new InvalidOperationException($"Embedded font resource '{ArabicFontResource}' was not found.");
+
+        FontManager.RegisterFontFromStream(fontStream);
+    }
+
     public byte[] Generate(Invoice invoice)
     {
         return Document.Create(container =>
@@ -16,6 +31,7 @@ public sealed class InvoicePdfGenerator : IInvoicePdfGenerator
             container.Page(page =>
             {
                 page.Margin(40);
+                page.DefaultTextStyle(style => style.FontFamily(ArabicFontFamily));
                 page.Header().Element(BuildHeader(invoice));
                 page.Content().Element(BuildInvoiceContent(invoice));
                 page.Footer().Element(BuildFooter());
@@ -35,14 +51,12 @@ public sealed class InvoicePdfGenerator : IInvoicePdfGenerator
                 {
                     container.Row(logoRow =>
                     {
-                        // Car repair icon placeholder
+                        // أيقونة مفتاح صيانة بصيغة SVG لتجنب الاعتماد على glyph خارجي.
                         logoRow.ConstantItem(50).Height(50)
                             .Background(Colors.Red.Medium)
                             .AlignCenter()
                             .AlignMiddle()
-                            .Text("🔧")
-                            .FontSize(24)
-                            .FontColor(Colors.White);
+                            .Svg(WrenchIconSvg);
 
                         // Company name with colorful letters
                         logoRow.RelativeItem().PaddingLeft(15).AlignMiddle().Text(text =>
@@ -67,12 +81,20 @@ public sealed class InvoicePdfGenerator : IInvoicePdfGenerator
                 // Invoice details
                 row.RelativeItem(1).AlignRight().Column(detailsCol =>
                 {
+                    var customerName = invoice.WorkOrder?.Vehicle?.Customer?.Name;
+                    if (!string.IsNullOrWhiteSpace(customerName))
+                    {
+                        detailsCol.Item().Text($"Customer: {customerName}")
+                            .FontSize(12)
+                            .FontColor(Colors.Grey.Darken3);
+                    }
+
                     detailsCol.Item().Text($"INVOICE #{invoice.Id.ToString().Substring(0, 8)}")
                         .FontSize(28)
                         .Bold()
                         .FontColor(Colors.Grey.Darken3);
 
-                    detailsCol.Item().PaddingTop(5).Text($"Date: {invoice.IssuedAtUtc:MMMM dd, yyyy}")
+                    detailsCol.Item().PaddingTop(5).Text($"Date: {invoice.IssuedAtUtc.ToString("MMMM dd, yyyy", CultureInfo.InvariantCulture)}")
                         .FontSize(12)
                         .FontColor(Colors.Grey.Medium);
 
@@ -172,7 +194,7 @@ public sealed class InvoicePdfGenerator : IInvoicePdfGenerator
                         .BorderBottom(1)
                         .BorderColor(Colors.Grey.Lighten2)
                         .AlignCenter()
-                        .Text($"{item.UnitPrice:C}")
+                        .Text(FormatCurrency(item.UnitPrice))
                         .FontSize(10)
                         .FontColor(Colors.Grey.Darken3);
 
@@ -182,7 +204,7 @@ public sealed class InvoicePdfGenerator : IInvoicePdfGenerator
                         .BorderBottom(1)
                         .BorderColor(Colors.Grey.Lighten2)
                         .AlignRight()
-                        .Text($"{item.LineTotal:C}")
+                        .Text(FormatCurrency(item.LineTotal))
                         .FontSize(10)
                         .FontColor(Colors.Grey.Darken3)
                         .Bold();
@@ -203,13 +225,13 @@ public sealed class InvoicePdfGenerator : IInvoicePdfGenerator
                     totalsCol.Item().PaddingVertical(5).Row(totalRow =>
                     {
                         totalRow.RelativeItem().Text("Subtotal:").FontSize(11).FontColor(Colors.Grey.Medium);
-                        totalRow.RelativeItem().AlignRight().Text($"{invoice.Subtotal:C}").FontSize(11).FontColor(Colors.Grey.Darken3);
+                        totalRow.RelativeItem().AlignRight().Text(FormatCurrency(invoice.Subtotal)).FontSize(11).FontColor(Colors.Grey.Darken3);
                     });
 
                     totalsCol.Item().PaddingVertical(5).Row(totalRow =>
                     {
                         totalRow.RelativeItem().Text("Tax:").FontSize(11).FontColor(Colors.Grey.Medium);
-                        totalRow.RelativeItem().AlignRight().Text($"{invoice.TaxAmount:C}").FontSize(11).FontColor(Colors.Grey.Darken3);
+                        totalRow.RelativeItem().AlignRight().Text(FormatCurrency(invoice.TaxAmount)).FontSize(11).FontColor(Colors.Grey.Darken3);
                     });
 
                     if (invoice.DiscountAmount > 0)
@@ -217,7 +239,7 @@ public sealed class InvoicePdfGenerator : IInvoicePdfGenerator
                         totalsCol.Item().PaddingVertical(5).Row(totalRow =>
                         {
                             totalRow.RelativeItem().Text("Discount:").FontSize(11).FontColor(Colors.Red.Medium);
-                            totalRow.RelativeItem().AlignRight().Text($"-{invoice.DiscountAmount:C}").FontSize(11).FontColor(Colors.Red.Medium);
+                            totalRow.RelativeItem().AlignRight().Text($"-{FormatCurrency(invoice.DiscountAmount)}").FontSize(11).FontColor(Colors.Red.Medium);
                         });
                     }
 
@@ -231,7 +253,7 @@ public sealed class InvoicePdfGenerator : IInvoicePdfGenerator
                         .Row(totalRow =>
                         {
                             totalRow.RelativeItem().Text("TOTAL:").FontSize(14).Bold().FontColor(Colors.Grey.Darken3);
-                            totalRow.RelativeItem().AlignRight().Text($"{invoice.Total:C}").FontSize(16).Bold().FontColor(Colors.Green.Medium);
+                            totalRow.RelativeItem().AlignRight().Text(FormatCurrency(invoice.Total)).FontSize(16).Bold().FontColor(Colors.Green.Medium);
                         });
                 });
             });
@@ -254,7 +276,7 @@ public sealed class InvoicePdfGenerator : IInvoicePdfGenerator
                 .Text(text =>
                 {
                     text.Span("Generated on ").FontSize(9).FontColor(Colors.Grey.Medium);
-                    text.Span($"{DateTime.UtcNow:MMMM dd, yyyy 'at' HH:mm} UTC")
+                    text.Span($"{DateTime.UtcNow.ToString("MMMM dd, yyyy 'at' HH:mm", CultureInfo.InvariantCulture)} UTC")
                         .FontSize(9)
                         .FontColor(Colors.Grey.Medium)
                         .SemiBold();
@@ -273,4 +295,7 @@ public sealed class InvoicePdfGenerator : IInvoicePdfGenerator
             _ => Colors.Grey.Medium
         };
     }
+
+    private static string FormatCurrency(decimal amount) =>
+        $"EGP {amount.ToString("N2", CultureInfo.InvariantCulture)}";
 }

@@ -50,7 +50,17 @@ namespace MechanicShop.Application.Features.Dashbord.Queris.GetWOkorderstats
 
 
             // Non-empty case: compute totals and return
-            var totalRevenue = await query.AsNoTracking().SumAsync(x => x.Invoice != null ? x.Invoice.Total : 0, cancellationToken);
+            var invoiceTotals = await query.AsNoTracking()
+                .Where(x => x.Invoice != null)
+                .Select(x => new
+                {
+                    Subtotal = x.Invoice!.LineItems.Sum(lineItem => lineItem.Quantity * lineItem.UnitPrice),
+                    x.Invoice.DiscountAmount,
+                    x.Invoice.TaxAmount
+                })
+                .ToListAsync(cancellationToken);
+            var totalRevenue = invoiceTotals.Sum(invoice =>
+                invoice.Subtotal - invoice.DiscountAmount + invoice.TaxAmount);
             var totalPartsCost = await query.AsNoTracking().SumAsync(x => x.RepairTasks.Sum(y => y.Parts.Sum(z => z.Cost)), cancellationToken);
             var totalLaborCost = await query.AsNoTracking().SumAsync(x => x.RepairTasks.Sum(y => y.LaborCost), cancellationToken);
             var uniqueVehicles = await query.AsNoTracking().Select(x => x.VehicleId).Distinct().CountAsync(cancellationToken);
