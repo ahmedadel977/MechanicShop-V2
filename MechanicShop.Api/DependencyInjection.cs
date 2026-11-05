@@ -1,4 +1,7 @@
 using System;
+using System.Globalization;
+using System.Net;
+using System.Security.Claims;
 using System.Text.Json.Serialization;
 using System.Threading.RateLimiting;
 using Asp.Versioning;
@@ -9,6 +12,7 @@ using MechanicShop.Application.Common.Interfaces;
 using MechanicShop.Infrastructure.Settings;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.Extensions.Configuration;
 using OpenTelemetry.Metrics;
@@ -34,7 +38,7 @@ public static class DependencyInjection
                 .AddValidation()
                 .AddConfiguredCors(configuration)
                 .AddIdentityInfrastructure()
-                .AddAppRateLimiting()
+                .AddAppRateLimiting(configuration)
                 .AddAppOutputCaching()
                 .AddAppOpenTelememrty()
                 .AddSignalR();
@@ -80,92 +84,116 @@ public static class DependencyInjection
 
     
 public static IServiceCollection AddAppRateLimiting(
-    this IServiceCollection services)
+    this IServiceCollection services,
+    IConfiguration configuration)
+{
+    var section = configuration.GetSection("RateLimiting");
+    var settings = section.Get<RateLimitSettings>() ?? new RateLimitSettings();
+    if (!settings.IsValid)
     {
-        services.AddRateLimiter(options =>
+        throw new InvalidOperationException("RateLimiting values must all be positive.");
+    }
+
+    services.AddOptions<RateLimitSettings>()
+        .Bind(section)
+        .Validate(value => value.IsValid, "RateLimiting values must all be positive.")
+        .ValidateOnStart();
+
+    var knownProxies = configuration.GetSection("ForwardedHeaders:KnownProxies").Get<string[]>() ?? [];
+    services.Configure<ForwardedHeadersOptions>(options =>
+    {
+        options.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
+        options.ForwardLimit = 1;
+        options.RequireHeaderSymmetry = true;
+        foreach (var proxy in knownProxies)
         {
-            // 1. Global Sliding Window + Concurrency
-            options.GlobalLimiter =
-                PartitionedRateLimiter.CreateChained(
-                    PartitionedRateLimiter.Create<HttpContext, string>(
-                        httpContext =>
-                            RateLimitPartition.GetSlidingWindowLimiter(
-                                partitionKey:
-                                    httpContext.Connection.RemoteIpAddress?.ToString()
-                                    ?? "unknown",
-                                factory: _ => new SlidingWindowRateLimiterOptions
-                                {
-                                    PermitLimit = 100,
-                                    Window = TimeSpan.FromMinutes(1),
-                                    SegmentsPerWindow = 6,
-                                    QueueLimit = 0,
-                                    AutoReplenishment = true
-                                })),
+            if (!IPAddress.TryParse(proxy, out var address))
+            {
+                throw new InvalidOperationException("ForwardedHeaders:KnownProxies must contain valid IP addresses.");
+            }
 
-                    PartitionedRateLimiter.Create<HttpContext, string>(
-                        _ => RateLimitPartition.GetConcurrencyLimiter(
-                            partitionKey: "GlobalConcurrency",
-                            factory: _ => new ConcurrencyLimiterOptions
-                            {
-                                PermitLimit = 50,
-                                QueueLimit = 0,
-                                QueueProcessingOrder =
-                                    QueueProcessingOrder.OldestFirst
-                            }))
-                );
+            options.KnownProxies.Add(address);
+        }
+    });
 
-            // 2. Login-specific rate limit
-            options.AddPolicy("LoginPolicy", httpContext =>
-                RateLimitPartition.GetFixedWindowLimiter(
-                    partitionKey:
-                        httpContext.Connection.RemoteIpAddress?.ToString()
-                        ?? "unknown",
-                    factory: _ => new FixedWindowRateLimiterOptions
+    services.AddRateLimiter(options =>
+    {
+        options.GlobalLimiter = PartitionedRateLimiter.CreateChained(
+            PartitionedRateLimiter.Create<HttpContext, string>(context =>
+                RateLimitPartition.GetSlidingWindowLimiter(
+                    context.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+                    _ => new SlidingWindowRateLimiterOptions
                     {
-                        PermitLimit = 5,
-                        Window = TimeSpan.FromMinutes(1),
+                        PermitLimit = settings.GlobalPermitLimit,
+                        Window = TimeSpan.FromMinutes(settings.GlobalWindowMinutes),
+                        SegmentsPerWindow = 6,
                         QueueLimit = 0,
                         AutoReplenishment = true
-                    }));
-
-            // 3. General authenticated-user policy
-            options.AddPolicy("ApiUserPolicy", httpContext =>
-                RateLimitPartition.GetFixedWindowLimiter(
-                    partitionKey:
-                        httpContext.User.Identity?.Name
-                        ?? httpContext.Connection.RemoteIpAddress?.ToString()
-                        ?? "anonymous",
-                    factory: _ => new FixedWindowRateLimiterOptions
+                    })),
+            PartitionedRateLimiter.Create<HttpContext, string>(_ =>
+                RateLimitPartition.GetConcurrencyLimiter(
+                    "GlobalConcurrency",
+                    _ => new ConcurrencyLimiterOptions
                     {
-                        PermitLimit = 5,
-                        Window = TimeSpan.FromMinutes(1),
+                        PermitLimit = settings.GlobalConcurrencyLimit,
                         QueueLimit = 0,
-                        AutoReplenishment = true
-                    }));
+                        QueueProcessingOrder = QueueProcessingOrder.OldestFirst
+                    })));
 
-            options.RejectionStatusCode =
-                StatusCodes.Status429TooManyRequests;
+        options.AddPolicy("LoginPolicy", context => FixedWindow(
+            context.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+            settings.LoginPermitLimit,
+            settings.LoginWindowMinutes));
 
-            //
-            // 2.Register specific rate limit
-            options.AddPolicy("RegisterPolicy", httpContext =>
+        options.AddPolicy("RefreshPolicy", context => FixedWindow(
+            context.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+            settings.RefreshPermitLimit,
+            settings.RefreshWindowMinutes));
+
+        options.AddPolicy("ApiUserPolicy", context => FixedWindow(
+            UserPartition(context),
+            settings.AuthenticatedUserPermitLimit,
+            settings.AuthenticatedUserWindowMinutes));
+
+        options.AddPolicy("RegisterPolicy", context => FixedWindow(
+            UserPartition(context),
+            settings.AccountCreationPermitLimit,
+            settings.AccountCreationWindowMinutes));
+
+        options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+        options.OnRejected = (context, _) =>
+        {
+            if (context.Lease.TryGetMetadata(MetadataName.RetryAfter, out var retryAfter))
+            {
+                var seconds = Math.Max(1, (int)Math.Ceiling(retryAfter.TotalSeconds));
+                context.HttpContext.Response.Headers.RetryAfter = seconds.ToString(CultureInfo.InvariantCulture);
+            }
+
+            return ValueTask.CompletedTask;
+        };
+    });
+
+    return services;
+}
+
+private static RateLimitPartition<string> FixedWindow(
+    string partitionKey,
+    int permitLimit,
+    int windowMinutes) =>
     RateLimitPartition.GetFixedWindowLimiter(
-        partitionKey:
-            httpContext.Connection.RemoteIpAddress?.ToString()
-            ?? "unknown",
-        factory: _ => new FixedWindowRateLimiterOptions
+        partitionKey,
+        _ => new FixedWindowRateLimiterOptions
         {
-            PermitLimit = 3,
-            Window = TimeSpan.FromMinutes(1),
+            PermitLimit = permitLimit,
+            Window = TimeSpan.FromMinutes(windowMinutes),
             QueueLimit = 0,
             AutoReplenishment = true
-        }));
         });
-           
 
-
-        return services;
-    }
+private static string UserPartition(HttpContext context) =>
+    context.User.FindFirstValue(ClaimTypes.NameIdentifier)
+    ?? context.Connection.RemoteIpAddress?.ToString()
+    ?? "unknown";
 
 
     public static IServiceCollection AddCustomProblemDetails(this IServiceCollection services)
@@ -269,7 +297,8 @@ public static IServiceCollection AddAppRateLimiting(
         // 2. Status code pages for handling HTTP status codes
         app.UseStatusCodePages();
 
-        // 3. HTTPS redirection (before any other middleware that might generate URLs)
+        app.UseForwardedHeaders();
+
         app.UseHttpsRedirection();
 
         // 4. Serilog request logging (early to log all requests)
@@ -278,15 +307,10 @@ public static IServiceCollection AddAppRateLimiting(
         // 5. CORS (before authentication/authorization)
         app.UseCors(configuration["AppSettings:CorsPolicyName"]!);
 
-        // 6. Rate limiting (before authentication to protect auth endpoints)
-        app.UseRateLimiter();
-
-        // 7. Authentication (must come before authorization)
         app.UseAuthentication();
 
         app.UseRateLimiter();
 
-        // 8. Authorization (must come after authentication)
         app.UseAuthorization();
 
         // 9. Output caching (after auth to cache based on user context)

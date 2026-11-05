@@ -14,7 +14,10 @@ namespace MechanicShop.Application.Features.WorkOrders.EventHandlers
 
         public Task Handle(WorkOrderCollectionModified notification, CancellationToken cancellationToken)
         {
-          return  _notifier.NotifyWorkOrdersChangedAsync(cancellationToken);
+            return _notifier.NotifyWorkOrdersChangedAsync(
+                notification.BranchId,
+                notification.LaborId,
+                cancellationToken);
             
         }
     }

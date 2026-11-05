@@ -2,5 +2,5 @@
 
 public interface IWorkOrderNotifier
 {
-    Task NotifyWorkOrdersChangedAsync(CancellationToken ct = default);
+    Task NotifyWorkOrdersChangedAsync(Guid branchId, Guid? laborId, CancellationToken ct = default);
 }

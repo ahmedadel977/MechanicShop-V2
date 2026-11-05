@@ -43,6 +43,46 @@ public sealed class IdentityService(
         return await CreateCurrentUserDtoAsync(user, cancellationToken);
     }
 
+    public async Task<Result<Updated>> ChangePasswordAsync(
+        string userId,
+        string currentPassword,
+        string newPassword,
+        CancellationToken cancellationToken = default)
+    {
+        var user = await _userManager.FindByIdAsync(userId);
+        if (user is null)
+        {
+            return Error.NotFound("Auth.User.NotFound", "User not found.");
+        }
+
+        await using var transaction = await _context.BeginTransactionAsync(cancellationToken);
+        var changeResult = await _userManager.ChangePasswordAsync(user, currentPassword, newPassword);
+        if (!changeResult.Succeeded)
+        {
+            await transaction.RollbackAsync(cancellationToken);
+            return Error.Validation(
+                "Auth.PasswordChange.Failed",
+                "The current password is invalid or the new password does not meet the password policy.");
+        }
+
+        var stampResult = await _userManager.UpdateSecurityStampAsync(user);
+        if (!stampResult.Succeeded)
+        {
+            await transaction.RollbackAsync(cancellationToken);
+            return Error.Failure("Auth.PasswordChange.Failed", "The password could not be changed.");
+        }
+
+        var revokedOnUtc = DateTimeOffset.UtcNow;
+        await _context.RefreshTokens
+            .Where(token => token.UserId == userId && token.RevokedOnUtc == null)
+            .ExecuteUpdateAsync(
+                setters => setters.SetProperty(token => token.RevokedOnUtc, revokedOnUtc),
+                cancellationToken);
+
+        await transaction.CommitAsync(cancellationToken);
+        return Result.Updated;
+    }
+
     public async Task<bool> AuthorizeAsync(string userId, string? policyName)
     {
         if (string.IsNullOrWhiteSpace(policyName))

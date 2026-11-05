@@ -1,7 +1,7 @@
 using System.Collections;
 using MechanicShop.Infrastructure.identity;
 using MechanicShop.Application.Common.Interfaces;
-using MechanicShop.Infrastructure.BackGroundJobs;
+using MechanicShop.Infrastructure.BackgroundJobs;
 using MechanicShop.Infrastructure.Date;
 using MechanicShop.Tests.Common.Branches;
 
@@ -91,6 +91,10 @@ public class WebAppFactory : WebApplicationFactory<IAssemblyMarker>, IAsyncLifet
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
         builder.UseEnvironment("Testing");
+        builder.UseSetting("JwtSettings:Secret", new string('t', 64));
+        builder.UseSetting("JwtSettings:Issuer", "MechanicShop.Test");
+        builder.UseSetting("JwtSettings:Audience", "MechanicShop.Test");
+        builder.UseSetting("JwtSettings:TokenExpirationInMinutes", "60");
         builder.UseSetting(
             "ConnectionStrings:Redis",
             _redisConnectionString ?? $"{_redisContainer.Hostname}:{_redisContainer.GetMappedPublicPort(6379)}");
@@ -104,12 +108,15 @@ public class WebAppFactory : WebApplicationFactory<IAssemblyMarker>, IAsyncLifet
                 var unactivatedPolicies = typeof(RateLimiterOptions)
                     .GetProperty("UnactivatedPolicyMap", BindingFlags.Instance | BindingFlags.NonPublic)?
                     .GetValue(options) as IDictionary;
-                unactivatedPolicies?.Remove("LoginPolicy");
                 var activatedPolicies = typeof(RateLimiterOptions)
                     .GetProperty("PolicyMap", BindingFlags.Instance | BindingFlags.NonPublic)?
                     .GetValue(options) as IDictionary;
-                activatedPolicies?.Remove("LoginPolicy");
-                options.AddPolicy("LoginPolicy", _ => RateLimitPartition.GetNoLimiter(0));
+                foreach (var policyName in new[] { "LoginPolicy", "RefreshPolicy", "ApiUserPolicy", "RegisterPolicy" })
+                {
+                    unactivatedPolicies?.Remove(policyName);
+                    activatedPolicies?.Remove(policyName);
+                    options.AddPolicy(policyName, _ => RateLimitPartition.GetNoLimiter(0));
+                }
             });
 
             services.RemoveAll<IDistributedCache>();

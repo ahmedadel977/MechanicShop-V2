@@ -82,6 +82,6 @@ app.UseAntiforgery();
 
 app.MapStaticAssets();
 
-app.MapHub<WorkOrderHub>("/hubs/workorders");
+app.MapHub<WorkOrderHub>("/hubs/workorders", options => options.CloseOnAuthenticationExpiration = true);
 
-app.Run();  
+app.Run();

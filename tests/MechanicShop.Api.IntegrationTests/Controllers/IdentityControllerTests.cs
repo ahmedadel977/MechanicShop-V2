@@ -69,6 +69,114 @@ public class IdentityControllerTests(WebAppFactory webAppFactory)
         Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
     }
 
+    [Fact]
+    public async Task Logout_WhenAuthenticated_ShouldRevokeAllRefreshTokens()
+    {
+        await AuthenticateAsManagerAsync();
+        using var scope = webAppFactory.CreateScope();
+        var context = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var managerId = TestUsers.Manager.Id;
+        Assert.True(await context.RefreshTokens.AnyAsync(
+            token => token.UserId == managerId && token.RevokedOnUtc == null,
+            TestContext.Current.CancellationToken));
+
+        var response = await _client.PostAsJsonAsync(
+            "/identity/logout",
+            new { },
+            TestContext.Current.CancellationToken);
+
+        Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
+        Assert.False(await context.RefreshTokens.AnyAsync(
+            token => token.UserId == managerId && token.RevokedOnUtc == null,
+            TestContext.Current.CancellationToken));
+    }
+
+    [Fact]
+    public async Task ChangePassword_WhenSuccessful_ShouldRevokeRefreshTokensAndRequireTheNewPassword()
+    {
+        using var scope = webAppFactory.CreateScope();
+        var context = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var userManager = scope.ServiceProvider.GetRequiredService<UserManager<AppUser>>();
+        var userId = Guid.NewGuid();
+        var email = $"password.change.{userId:N}@localhost";
+        const string currentPassword = "Initial-password-1!";
+        const string newPassword = "Changed-password-2!";
+        var user = new AppUser
+        {
+            Id = userId.ToString(),
+            Email = email,
+            UserName = email,
+            EmailConfirmed = true
+        };
+        Assert.True((await userManager.CreateAsync(user, currentPassword)).Succeeded);
+        Assert.True((await userManager.AddToRoleAsync(user, nameof(Role.Labor))).Succeeded);
+        context.Employees.Add(Employee.Create(userId, "Password", "Test", Role.Labor).Value);
+        context.EmployeeBranchMemberships.Add(
+            EmployeeBranchMembership.Create(
+                userId,
+                MechanicShop.Tests.Common.Branches.TestBranchIds.Main,
+                isDefault: true).Value);
+        await context.SaveChangesAsync(TestContext.Current.CancellationToken);
+
+        try
+        {
+            var loginResponse = await _client.PostAsJsonAsync(
+                "/identity/token/generate",
+                new { Email = email, Password = currentPassword },
+                TestContext.Current.CancellationToken);
+            Assert.Equal(HttpStatusCode.OK, loginResponse.StatusCode);
+            var tokens = await loginResponse.Content.ReadFromJsonAsync<TokenResponse>(
+                TestContext.Current.CancellationToken);
+            Assert.NotNull(tokens?.AccessToken);
+            _client.SetAuthorizationHeader(tokens!.AccessToken!);
+
+            var response = await _client.PostAsJsonAsync(
+                "/identity/change-password",
+                new
+                {
+                    UserId = user.Id,
+                    CurrentPassword = currentPassword,
+                    NewPassword = newPassword
+                },
+                TestContext.Current.CancellationToken);
+
+            var responseBody = await response.Content.ReadAsStringAsync(
+                TestContext.Current.CancellationToken);
+            Assert.True(
+                response.StatusCode == HttpStatusCode.NoContent,
+                $"Expected successful password change but received {(int)response.StatusCode}: {responseBody}");
+            Assert.False(await context.RefreshTokens.AnyAsync(
+                token => token.UserId == user.Id && token.RevokedOnUtc == null,
+                TestContext.Current.CancellationToken));
+
+            var oldPasswordResponse = await _client.PostAsJsonAsync(
+                "/identity/token/generate",
+                new { Email = email, Password = currentPassword },
+                TestContext.Current.CancellationToken);
+            Assert.Equal(HttpStatusCode.Conflict, oldPasswordResponse.StatusCode);
+
+            var newPasswordResponse = await _client.PostAsJsonAsync(
+                "/identity/token/generate",
+                new { Email = email, Password = newPassword },
+                TestContext.Current.CancellationToken);
+            Assert.Equal(HttpStatusCode.OK, newPasswordResponse.StatusCode);
+        }
+        finally
+        {
+            await context.RefreshTokens
+                .Where(token => token.UserId == user.Id)
+                .ExecuteDeleteAsync(TestContext.Current.CancellationToken);
+            await context.EmployeeBranchMemberships
+                .Where(membership => membership.EmployeeId == userId)
+                .ExecuteDeleteAsync(TestContext.Current.CancellationToken);
+            await context.Employees
+                .Where(employee => employee.Id == userId)
+                .ExecuteDeleteAsync(TestContext.Current.CancellationToken);
+            await userManager.DeleteAsync(user);
+            _client.ClearAuthorizationHeader();
+        }
+    }
+
 [Fact]
     public async Task GenerateToken_WhenCredentialsAreInvalid_ShouldReturnConflict()
     {

@@ -50,7 +50,7 @@ public class DeleteWorkOrderCommandHandler(
         _context.WorkOrders.Entry(workOrder).Property(order => order.RowVersion).OriginalValue = command.RowVersion!;
         try
         {
-            workOrder.AddDomainEvent(new WorkOrderCollectionModified());
+            workOrder.AddDomainEvent(new WorkOrderCollectionModified(workOrder.BranchId, workOrder.LaborId));
             await _context.SaveChangesAsync(ct);
         }
         catch (DbUpdateConcurrencyException)

@@ -9,6 +9,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
+using System.Security.Cryptography;
 using System.Text;
 using Microsoft.IdentityModel.Tokens;
 
@@ -46,12 +47,63 @@ public class RefreshTokenQueryHandlerTests(WebAppFactory factory)
         Assert.False(string.IsNullOrWhiteSpace(result.Value.AccessToken));
         Assert.False(string.IsNullOrWhiteSpace(result.Value.RefreshToken));
         Assert.NotEqual(refreshToken, result.Value.RefreshToken);
-        Assert.False(await _context.RefreshTokens.AnyAsync(
-            token => token.Token == refreshToken,
-            TestContext.Current.CancellationToken));
+        var previousToken = await _context.RefreshTokens
+            .AsNoTracking()
+            .SingleAsync(
+                token => token.TokenHash == HashToken(refreshToken),
+                TestContext.Current.CancellationToken);
+        Assert.NotNull(previousToken.RevokedOnUtc);
+        Assert.Equal(HashToken(result.Value.RefreshToken), previousToken.ReplacedByTokenHash);
         Assert.True(await _context.RefreshTokens.AnyAsync(
-            token => token.Token == result.Value.RefreshToken && token.UserId == user.UserId,
+            token => token.TokenHash == HashToken(result.Value.RefreshToken)
+                && token.UserId == user.UserId
+                && token.FamilyId == previousToken.FamilyId,
             TestContext.Current.CancellationToken));
+    }
+
+    [Fact]
+    public async Task Handle_WhenAccessTokenHasNotExpired_ShouldRejectRefreshRequest()
+    {
+        var user = await GetManagerAsync();
+        var refreshToken = await AddRefreshTokenAsync(user.UserId);
+        var validAccessToken = CreateAccessToken(user.UserId, DateTime.UtcNow.AddMinutes(15));
+
+        var result = await _mediator.Send(
+            new RefreshTokenQuery(refreshToken, validAccessToken),
+            TestContext.Current.CancellationToken);
+
+        Assert.True(result.IsError);
+        Assert.Equal("Auth.ExpiredAccessToken.Invalid", result.Errors[0].Code);
+    }
+
+    [Fact]
+    public async Task Handle_WhenRotatedRefreshTokenIsReused_ShouldRevokeItsFamily()
+    {
+        var user = await GetManagerAsync();
+        var refreshToken = await AddRefreshTokenAsync(user.UserId);
+        var expiredAccessToken = CreateAccessToken(user.UserId, DateTime.UtcNow.AddMinutes(-5));
+        var familyId = await _context.RefreshTokens
+            .Where(token => token.TokenHash == HashToken(refreshToken))
+            .Select(token => token.FamilyId)
+            .SingleAsync(TestContext.Current.CancellationToken);
+
+        var firstRotation = await _mediator.Send(
+            new RefreshTokenQuery(refreshToken, expiredAccessToken),
+            TestContext.Current.CancellationToken);
+        Assert.True(firstRotation.IsSuccess);
+
+        var replay = await _mediator.Send(
+            new RefreshTokenQuery(refreshToken, expiredAccessToken),
+            TestContext.Current.CancellationToken);
+
+        Assert.True(replay.IsError);
+        Assert.Equal("Auth.RefreshToken.ReuseDetected", replay.Errors[0].Code);
+        Assert.All(
+            await _context.RefreshTokens
+                .AsNoTracking()
+                .Where(token => token.FamilyId == familyId)
+                .ToListAsync(TestContext.Current.CancellationToken),
+            token => Assert.NotNull(token.RevokedOnUtc));
     }
 
     [Fact]
@@ -60,7 +112,7 @@ public class RefreshTokenQueryHandlerTests(WebAppFactory factory)
         var user = await GetManagerAsync();
         var refreshToken = await AddRefreshTokenAsync(user.UserId);
         await _context.RefreshTokens
-            .Where(token => token.Token == refreshToken)
+            .Where(token => token.TokenHash == HashToken(refreshToken))
             .ExecuteUpdateAsync(
                 setters => setters.SetProperty(
                     token => token.ExpiresOnUtc,
@@ -177,13 +229,17 @@ public class RefreshTokenQueryHandlerTests(WebAppFactory factory)
         var token = $"refresh-{Guid.NewGuid():N}";
         var entity = RefreshToken.Create(
             Guid.NewGuid(),
-            token,
+            HashToken(token),
             userId,
+            Guid.NewGuid(),
             DateTimeOffset.UtcNow.AddDays(1)).Value;
         await _context.RefreshTokens.AddAsync(entity, TestContext.Current.CancellationToken);
         await _context.SaveChangesAsync(TestContext.Current.CancellationToken);
         return token;
     }
+
+    private static string HashToken(string rawToken) =>
+        Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(rawToken)));
 
     private string CreateAccessToken(string? userId, DateTime expiresAtUtc, Guid? branchId = null)
     {

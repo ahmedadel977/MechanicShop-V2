@@ -13,5 +13,11 @@ public interface IIdentityService
 
     Task<Result<AppUserDto>> GetUserByIdAsync(string userId, CancellationToken cancellationToken = default);
 
+    Task<Result<Updated>> ChangePasswordAsync(
+        string userId,
+        string currentPassword,
+        string newPassword,
+        CancellationToken cancellationToken = default);
+
     Task<string?> GetUserNameAsync(string userId);
 }

@@ -1,5 +1,5 @@
 using MechanicShop.Application.Common.Interfaces;
-using MechanicShop.Infrastructure.BackGroundJobs;
+
 using MechanicShop.Infrastructure.Date;
 using MechanicShop.Infrastructure.Date.Interceptors;
 using MechanicShop.Infrastructure.identity;
@@ -16,6 +16,8 @@ using Microsoft.Extensions.Caching.Hybrid;
 using Microsoft.Extensions.Configuration;
 using Microsoft.IdentityModel.Tokens;
 using System.Text;
+using System.Security.Claims;
+using MechanicShop.Infrastructure.BackgroundJobs;
 
 namespace Microsoft.Extensions.DependencyInjection;
 
@@ -59,14 +61,26 @@ public static class DependencyInjection
         services.AddScoped<IAppDbContext>(provider => provider.GetRequiredService<AppDbContext>());
 
 
+        var jwtSettingsSection = configuration.GetSection("JwtSettings");
+        var jwtSettings = jwtSettingsSection.Get<JwtSettings>() ?? new JwtSettings();
+        if (!jwtSettings.IsValid)
+        {
+            throw new InvalidOperationException(
+                "JwtSettings requires a secret of at least 32 UTF-8 bytes, an issuer, an audience, and a positive token lifetime.");
+        }
+
+        services.AddOptions<JwtSettings>()
+            .Bind(jwtSettingsSection)
+            .Validate(settings => settings.IsValid,
+                "JwtSettings requires a secret of at least 32 UTF-8 bytes, an issuer, an audience, and a positive token lifetime.")
+            .ValidateOnStart();
+
             services.AddAuthentication(options =>
             {
                 options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
                 options.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
             }).AddJwtBearer(options =>
             {
-                var jwtSettings = configuration.GetSection("JwtSettings");
-
                 options.TokenValidationParameters = new TokenValidationParameters
                 {
                     ValidateIssuer = true,
@@ -74,10 +88,28 @@ public static class DependencyInjection
                     ValidateLifetime = true,
                     ClockSkew = TimeSpan.Zero,
                     ValidateIssuerSigningKey = true,
-                    ValidIssuer = jwtSettings["Issuer"],
-                    ValidAudience = jwtSettings["Audience"],
-                    IssuerSigningKey = new SymmetricSecurityKey(
-                           Encoding.UTF8.GetBytes(jwtSettings["Secret"]!)),
+                    RequireSignedTokens = true,
+                    ValidAlgorithms = [SecurityAlgorithms.HmacSha256],
+                    ValidIssuer = jwtSettings.Issuer,
+                    ValidAudience = jwtSettings.Audience,
+                    IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtSettings.Secret)),
+                    NameClaimType = ClaimTypes.NameIdentifier,
+                    RoleClaimType = ClaimTypes.Role
+                };
+
+                options.Events = new JwtBearerEvents
+                {
+                    OnMessageReceived = context =>
+                    {
+                        var accessToken = context.Request.Query["access_token"].ToString();
+                        if (!string.IsNullOrEmpty(accessToken)
+                            && context.HttpContext.Request.Path.StartsWithSegments("/hubs/workorders"))
+                        {
+                            context.Token = accessToken;
+                        }
+
+                        return Task.CompletedTask;
+                    }
                 };
             });
 

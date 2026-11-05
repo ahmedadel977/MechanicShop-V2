@@ -2,7 +2,7 @@
 using MechanicShop.Application.Common.Interfaces;
 using MechanicShop.Application.SubcutaneousTests.Common;
 
-using MechanicShop.Infrastructure.BackGroundJobs;
+using MechanicShop.Infrastructure.BackgroundJobs;
 using MechanicShop.Infrastructure.Date;
 using MechanicShop.Infrastructure.Settings;
 using MechanicShop.Tests.Common.Branches;
@@ -83,6 +83,10 @@ public class WebAppFactory : WebApplicationFactory<IAssemblyMarker>, IAsyncLifet
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
         builder.UseEnvironment("Testing");
+        builder.UseSetting("JwtSettings:Secret", new string('t', 64));
+        builder.UseSetting("JwtSettings:Issuer", "MechanicShop.Test");
+        builder.UseSetting("JwtSettings:Audience", "MechanicShop.Test");
+        builder.UseSetting("JwtSettings:TokenExpirationInMinutes", "60");
         builder.ConfigureTestServices(services =>
         {
             services.RemoveAll<IHostedService>();

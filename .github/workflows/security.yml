@@ -1,0 +1,46 @@
+name: Security and verification
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Set up .NET
+        uses: actions/setup-dotnet@v6
+        with:
+          global-json-file: global.json
+
+      - name: Restore
+        run: dotnet restore MechanicShop.slnx
+
+      - name: Build
+        run: dotnet build MechanicShop.slnx --no-restore
+
+      - name: Test
+        run: dotnet test MechanicShop.slnx --no-build
+
+      - name: Check vulnerable packages
+        shell: bash
+        run: |
+          audit_output="$(dotnet list MechanicShop.slnx package --vulnerable --include-transitive 2>&1)"
+          printf '%s\n' "$audit_output"
+          if printf '%s\n' "$audit_output" | grep -Eiq 'Severity:[[:space:]]*(Critical|High|Moderate|Low)'; then
+            echo "Vulnerable NuGet packages were reported."
+            exit 1
+          fi
+
+      - name: Scan repository for secrets
+        uses: gitleaks/gitleaks-action@v3
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

@@ -11,17 +11,25 @@ public class RefreshTokenTests
     {
         var id = Guid.NewGuid();
         var userId = Guid.NewGuid().ToString();
-        const string tokenValue = "token";
+        var tokenHash = new string('b', 64);
+        var familyId = Guid.NewGuid();
         var expiresOnUtc = DateTimeOffset.UtcNow.AddDays(7);
 
-        var result = RefreshTokenFactory.CreateRefreshToken(id: id, token: tokenValue, userId: userId, expiresOnUtc: expiresOnUtc);
+        var result = RefreshTokenFactory.CreateRefreshToken(
+            id: id,
+            tokenHash: tokenHash,
+            userId: userId,
+            familyId: familyId,
+            expiresOnUtc: expiresOnUtc);
 
         Assert.True(result.IsSuccess);
 
         var token = result.Value;
 
         Assert.NotNull(token);
-        Assert.Equal(tokenValue, token.Token);
+        Assert.Equal(tokenHash, token.TokenHash);
+        Assert.Equal(familyId, token.FamilyId);
+        Assert.Null(token.RevokedOnUtc);
         Assert.False(string.IsNullOrWhiteSpace(token.UserId));
         Assert.Equal(userId, token.UserId);
         Assert.True(token.ExpiresOnUtc > DateTimeOffset.UtcNow);
@@ -40,13 +48,26 @@ public class RefreshTokenTests
     [Theory]
     [InlineData("")]
     [InlineData("   ")]
-    public void CreateRefreshToken_ShouldFail_WhenTokenInvalid(string? invalidToken)
+    public void CreateRefreshToken_ShouldFail_WhenTokenHashInvalid(string? invalidToken)
     {
-        var result = RefreshTokenFactory.CreateRefreshToken(token: invalidToken);
+        var result = RefreshTokenFactory.CreateRefreshToken(tokenHash: invalidToken);
 
         Assert.True(result.IsError);
 
         Assert.Equal("RefreshToken_Token_Required", result.TopError.Code);
+    }
+
+    [Fact]
+    public void Revoke_ShouldRecordRevocationAndReplacementHash()
+    {
+        var token = RefreshTokenFactory.CreateRefreshToken().Value;
+        var revokedOnUtc = DateTimeOffset.UtcNow;
+        var replacementHash = new string('c', 64);
+
+        Assert.True(token.Revoke(revokedOnUtc, replacementHash));
+        Assert.False(token.Revoke(revokedOnUtc.AddSeconds(1)));
+        Assert.Equal(revokedOnUtc, token.RevokedOnUtc);
+        Assert.Equal(replacementHash, token.ReplacedByTokenHash);
     }
 
     [Theory]

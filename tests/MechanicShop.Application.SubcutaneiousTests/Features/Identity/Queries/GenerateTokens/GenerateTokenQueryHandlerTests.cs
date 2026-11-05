@@ -4,6 +4,8 @@ using MechanicShop.Application.SubcutaneousTests.Common;
 using MediatR;
 using Microsoft.EntityFrameworkCore;
 using System.IdentityModel.Tokens.Jwt;
+using System.Security.Cryptography;
+using System.Text;
 
 namespace MechanicShop.Application.SubcutaneousTests.Features.Identity.Queries.GenerateTokens;
 
@@ -44,9 +46,12 @@ public class GenerateTokenQueryHandlerTests(WebAppFactory factory)
         Assert.False(string.IsNullOrWhiteSpace(result.Value.AccessToken));
         Assert.False(string.IsNullOrWhiteSpace(result.Value.RefreshToken));
         Assert.True(await _context.RefreshTokens.AnyAsync(
-            token => token.Token == result.Value.RefreshToken,
+            token => token.TokenHash == HashToken(result.Value.RefreshToken!),
             TestContext.Current.CancellationToken));
     }
+
+    private static string HashToken(string rawToken) =>
+        Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(rawToken)));
 
     [Fact]
     public async Task Handle_WhenLaborCredentialsAreValid_ShouldIncludeLaborRoleInAccessToken()

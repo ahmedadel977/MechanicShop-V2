@@ -5,9 +5,12 @@ using Asp.Versioning;
 
 using MechanicShop.Application.Features.Identity;
 using MechanicShop.Application.Features.Identity.Dtos;
+using MechanicShop.Application.Features.Identity.Commands.ChangePassword;
+using MechanicShop.Application.Features.Identity.Commands.Logout;
 using MechanicShop.Application.Features.Identity.Queries.GenerateTokens;
 using MechanicShop.Application.Features.Identity.Queries.GetUserInfo;
 using MechanicShop.Application.Features.Identity.Queries.RefreshTokens;
+
 
 using MediatR;
 
@@ -46,12 +49,48 @@ public sealed class IdentityController(ISender sender) : ApiController
     [EndpointDescription("Exchanges an expired access token and a valid refresh token for a new token pair.")]
     [EndpointName("RefreshToken")]
     [ProducesResponseType(typeof(TokenResponse), StatusCodes.Status200OK)]
+    [EnableRateLimiting("RefreshPolicy")]
     public async Task<IActionResult> RefreshToken([FromBody] RefreshTokenQuery request, CancellationToken ct)
     {
         var result = await sender.Send(request, ct);
         return result.Match(
             response => Ok(response),
             Problem);
+    }
+
+    [HttpPost("logout")]
+    [Authorize]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    public async Task<IActionResult> Logout(CancellationToken ct)
+    {
+        var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+        if (string.IsNullOrWhiteSpace(userId))
+        {
+            return Unauthorized();
+        }
+
+        var result = await sender.Send(new LogoutCommand(userId), ct);
+        return result.Match(_ => NoContent(), Problem);
+    }
+
+    [HttpPost("change-password")]
+    [Authorize]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    public async Task<IActionResult> ChangePassword([FromBody] ChangePasswordCommand request, CancellationToken ct)
+    {
+        var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+        if (string.IsNullOrWhiteSpace(userId))
+        {
+            return Unauthorized();
+        }
+
+        var result = await sender.Send(
+            new ChangePasswordCommand(userId, request.CurrentPassword, request.NewPassword),
+            ct);
+        return result.Match(_ => NoContent(), Problem);
     }
 
     [HttpGet("current-user/claims")]

@@ -88,12 +88,21 @@ public class WorkOrdersControllerTests : IDisposable
 
         _client.SetAuthorizationHeader(token);
 
+        var branch = await _context.Branches
+            .IgnoreQueryFilters()
+            .SingleAsync(item => item.Id == MechanicShop.Tests.Common.Branches.TestBranchIds.Main,
+                TestContext.Current.CancellationToken);
+        var wasBranchActive = branch.IsActive;
+        branch.SetActive(true);
+        await _context.SaveChangesAsync(TestContext.Current.CancellationToken);
+
         var vehicle = await _context.Vehicles.OrderBy(vehicle => vehicle.Id)
             .FirstAsync(TestContext.Current.CancellationToken);
         var repairTask = await _context.RepairTasks.OrderBy(task => task.Id)
             .FirstAsync(TestContext.Current.CancellationToken);
         var startAt = DateTimeOffset.UtcNow.AddMinutes(-20);
         var workOrder = WorkOrderTestDataBuilder.Create()
+            .WithBranch(MechanicShop.Tests.Common.Branches.TestBranchIds.Main)
             .WithVehicle(vehicle.Id)
             .WithLabor(TestUsers.Labor01.Id)
             .WithTimeSlot(startAt, startAt.AddHours(1))
@@ -102,18 +111,28 @@ public class WorkOrdersControllerTests : IDisposable
             .WithRepairTasks(repairTask)
             .Build();
 
-        _context.WorkOrders.Add(workOrder);
-        await _context.SaveChangesAsync(TestContext.Current.CancellationToken);
-
-        var startDate = DateTimeOffset.UtcNow.AddDays(-1).ToString("yyyy-MM-dd");
-        var endDate = DateTimeOffset.UtcNow.AddDays(1).ToString("yyyy-MM-dd");
-        var query = $"page=1&pageSize=10&searchTerm={Uri.EscapeDataString(vehicle.Make)}" +
-            $"&state={(int)WorkOrderState.InProgress}&vehicleId={vehicle.Id}" +
-            $"&laborId={TestUsers.Labor01.Id}&spot={(int)Contracts.Common.Spot.A}" +
-            $"&startDateFrom={startDate}&startDateTo={endDate}";
-
         try
         {
+            _context.WorkOrders.Add(workOrder);
+            await _context.SaveChangesAsync(TestContext.Current.CancellationToken);
+
+            var persistedWorkOrder = await _context.WorkOrders
+                .IgnoreQueryFilters()
+                .AsNoTracking()
+                .SingleAsync(item => item.Id == workOrder.Id, TestContext.Current.CancellationToken);
+            Assert.Equal(vehicle.Id, persistedWorkOrder.VehicleId);
+            Assert.Equal(Guid.Parse(TestUsers.Labor01.Id), persistedWorkOrder.LaborId);
+            Assert.Equal(WorkOrderState.InProgress, persistedWorkOrder.State);
+            Assert.Equal(MechanicShop.Domain.Workorders.Enums.Spot.A, persistedWorkOrder.Spot);
+
+            var localNow = DateTime.Now;
+            var startDateFrom = localNow.AddDays(-1).ToString("yyyy-MM-dd");
+            var startDateTo = localNow.AddDays(1).ToString("yyyy-MM-dd");
+            var query = $"page=1&pageSize=10&searchTerm={Uri.EscapeDataString(vehicle.Make)}" +
+                $"&state={(int)WorkOrderState.InProgress}&vehicleId={persistedWorkOrder.VehicleId}" +
+                $"&laborId={persistedWorkOrder.LaborId}&spot={(int)Contracts.Common.Spot.A}" +
+                $"&startDateFrom={startDateFrom}&startDateTo={startDateTo}";
+
             var response = await _client.GetAsync(
                 $"/api/v1.0/workorders?{query}",
                 TestContext.Current.CancellationToken);
@@ -131,8 +150,10 @@ public class WorkOrdersControllerTests : IDisposable
         }
         finally
         {
-            await _context.WorkOrders.Where(item => item.Id == workOrder.Id)
+            await _context.WorkOrders.IgnoreQueryFilters().Where(item => item.Id == workOrder.Id)
                 .ExecuteDeleteAsync(TestContext.Current.CancellationToken);
+            branch.SetActive(wasBranchActive);
+            await _context.SaveChangesAsync(TestContext.Current.CancellationToken);
         }
     }
 

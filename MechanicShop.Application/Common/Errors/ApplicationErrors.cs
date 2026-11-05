@@ -75,6 +75,10 @@ public static class ApplicationErrors
         code: "Auth.RefreshToken.Expired",
         description: "Refresh token is invalid or has expired.");
 
+    public static readonly Error RefreshTokenReuseDetected = Error.Conflict(
+        code: "Auth.RefreshToken.ReuseDetected",
+        description: "Refresh token reuse was detected and the session has been revoked.");
+
     public static readonly Error UserNotFound = Error.NotFound(
         code: "Auth.User.NotFound",
         description: "User not found.");

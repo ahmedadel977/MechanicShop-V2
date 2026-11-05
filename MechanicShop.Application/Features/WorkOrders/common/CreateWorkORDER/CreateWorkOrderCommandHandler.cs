@@ -167,7 +167,7 @@ public class CreateWorkOrderCommandHandler(
         var workOrder = createWorkOrderResult.Value;
         await _context.WorkOrders.AddAsync(workOrder, cancellationToken);
 
-        workOrder.AddDomainEvent(new WorkOrderCollectionModified());
+        workOrder.AddDomainEvent(new WorkOrderCollectionModified(workOrder.BranchId, workOrder.LaborId));
         await _context.SaveChangesAsync(cancellationToken);
 
         _logger.LogInformation("WorkOrder with Id '{WorkOrderId}' created successfully.", workOrder.Id);

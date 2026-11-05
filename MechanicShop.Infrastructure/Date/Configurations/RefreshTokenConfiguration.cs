@@ -12,12 +12,16 @@ public class RefreshTokenConfiguration : IEntityTypeConfiguration<RefreshToken>
 
         builder.HasKey(rt => rt.Id).IsClustered(false);
 
-        builder.Property(rt => rt.Token).HasMaxLength(200);
+        builder.Property(rt => rt.TokenHash).HasMaxLength(64).IsRequired();
 
-        builder.HasIndex(rt => rt.Token).IsUnique();
+        builder.HasIndex(rt => rt.TokenHash).IsUnique();
 
         builder.Property(rt => rt.UserId).IsRequired();
+        builder.Property(rt => rt.FamilyId).IsRequired();
 
         builder.Property(rt => rt.ExpiresOnUtc).IsRequired();
+        builder.Property(rt => rt.RevokedOnUtc);
+        builder.Property(rt => rt.ReplacedByTokenHash).HasMaxLength(64);
+        builder.HasIndex(rt => new { rt.UserId, rt.FamilyId });
     }
 }

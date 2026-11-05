@@ -5,6 +5,7 @@ using MechanicShop.Contracts.Requests.Employees;
 using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 
 namespace MechanicShop.Api.Controllers;
 
@@ -15,6 +16,7 @@ namespace MechanicShop.Api.Controllers;
 public sealed class EmployeesController(ISender sender) : ApiController
 {
     [HttpPost("labors")]
+    [EnableRateLimiting("RegisterPolicy")]
     [Authorize(Policy = "ManagerOnly")]
     [ProducesResponseType(StatusCodes.Status201Created)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
@@ -44,6 +46,7 @@ public sealed class EmployeesController(ISender sender) : ApiController
     }
 
     [HttpPost("branch-managers")]
+    [EnableRateLimiting("RegisterPolicy")]
     [Authorize(Policy = "CompanyOnly")]
     [ProducesResponseType(StatusCodes.Status201Created)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]

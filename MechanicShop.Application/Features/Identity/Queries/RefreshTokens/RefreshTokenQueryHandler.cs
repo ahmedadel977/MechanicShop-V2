@@ -3,7 +3,6 @@ using MechanicShop.Application.Common.Errors;
 using MechanicShop.Application.Common.Interfaces;
 using MechanicShop.Domain.Common.Results;
 using MediatR;
-using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 
 namespace MechanicShop.Application.Features.Identity.Queries.RefreshTokens;
@@ -11,13 +10,11 @@ namespace MechanicShop.Application.Features.Identity.Queries.RefreshTokens;
 public sealed class RefreshTokenQueryHandler(
     ILogger<RefreshTokenQueryHandler> logger,
     IIdentityService identityService,
-    IAppDbContext context,
     ITokenProvider tokenProvider)
     : IRequestHandler<RefreshTokenQuery, Result<TokenResponse>>
 {
     private readonly ILogger<RefreshTokenQueryHandler> _logger = logger;
     private readonly IIdentityService _identityService = identityService;
-    private readonly IAppDbContext _context = context;
     private readonly ITokenProvider _tokenProvider = tokenProvider;
 
     public async Task<Result<TokenResponse>> Handle(RefreshTokenQuery request, CancellationToken cancellationToken)
@@ -36,16 +33,6 @@ public sealed class RefreshTokenQueryHandler(
             return ApplicationErrors.UserIdClaimInvalid;
         }
 
-        var refreshToken = await _context.RefreshTokens
-            .SingleOrDefaultAsync(
-                token => token.Token == request.RefreshToken && token.UserId == userId,
-                cancellationToken);
-        if (refreshToken is null || refreshToken.ExpiresOnUtc <= DateTimeOffset.UtcNow)
-        {
-            _logger.LogWarning("Refresh token is invalid, expired, or does not belong to UserId {UserId}.", userId);
-            return ApplicationErrors.RefreshTokenExpired;
-        }
-
         var userResult = await _identityService.GetUserByIdAsync(userId, cancellationToken);
         if (userResult.IsError)
         {
@@ -53,7 +40,10 @@ public sealed class RefreshTokenQueryHandler(
             return userResult.Errors;
         }
 
-        var tokenResult = await _tokenProvider.GenerateJwtTokenAsync(userResult.Value, cancellationToken);
+        var tokenResult = await _tokenProvider.RotateRefreshTokenAsync(
+            userResult.Value,
+            request.RefreshToken,
+            cancellationToken);
         if (tokenResult.IsError)
         {
             _logger.LogError("Token generation failed for UserId {UserId}.", userId);
