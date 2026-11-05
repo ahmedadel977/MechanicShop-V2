@@ -11,10 +11,19 @@ public class WorkOrderConfiguration : IEntityTypeConfiguration<WorkOrder>
     {
         builder.HasKey(w => w.Id).IsClustered(false);
 
+        builder.Property(w => w.BranchId).IsRequired();
+        builder.HasOne<MechanicShop.Domain.Branches.Branch>()
+            .WithMany()
+            .HasForeignKey(w => w.BranchId)
+            .OnDelete(DeleteBehavior.Restrict);
+        builder.Property(w => w.RowVersion).IsRowVersion();
+
         builder.Property(w => w.LaborId)
                .IsRequired(false);
 
-        builder.HasOne(w => w.Labor).WithMany().HasForeignKey(w => w.LaborId).IsRequired(false);
+        builder.HasOne(w => w.Labor).WithMany().HasForeignKey(w => w.LaborId)
+            .IsRequired(false)
+            .OnDelete(DeleteBehavior.Cascade);
 
         builder.HasOne(i => i.Invoice)
             .WithOne(w => w.WorkOrder)
@@ -47,6 +56,7 @@ public class WorkOrderConfiguration : IEntityTypeConfiguration<WorkOrder>
         builder.HasIndex(w => w.VehicleId);
         builder.HasIndex(w => w.State);
         builder.HasIndex(a => new { a.StartAtUtc, a.EndAtUtc });
+        builder.HasIndex(w => new { w.BranchId, w.StartAtUtc, w.EndAtUtc });
 
         builder.Property(w => w.Spot).HasConversion<string>().IsRequired();
     }

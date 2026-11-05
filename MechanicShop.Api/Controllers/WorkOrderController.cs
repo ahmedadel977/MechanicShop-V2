@@ -23,6 +23,7 @@ namespace MechanicShop.Api.Controllers;
 [Route("api/v{version:apiVersion}/workorders")]
 [ApiVersion("1.0")]
 [Authorize]
+[Authorize(Policy = "ActiveBranchAccess")]
 public sealed class WorkOrdersController(ISender sender) : ApiController
 {
     [HttpGet]
@@ -108,7 +109,8 @@ public sealed class WorkOrdersController(ISender sender) : ApiController
                 request.VehicleId,
                 request.StartAtUtc,
                 request.RepairTaskIds,
-                request.LaborId),
+                request.LaborId,
+                request.BranchId),
             ct);
 
         return result.Match(
@@ -139,7 +141,8 @@ public sealed class WorkOrdersController(ISender sender) : ApiController
         var command = new RelocateWorkOrderCommand(
             workOrderId,
             request.NewStartAtUtc,
-            (Spot)(int)request.NewSpot);
+            (Spot)(int)request.NewSpot,
+            request.RowVersion);
 
         var result = await sender.Send(command, ct);
 
@@ -163,7 +166,7 @@ public sealed class WorkOrdersController(ISender sender) : ApiController
         AssignLaborRequest request,
         CancellationToken ct)
     {
-        var command = new AssignLaborCommand(workOrderId, Guid.Parse(request.LaborId));
+        var command = new AssignLaborCommand(workOrderId, Guid.Parse(request.LaborId), request.RowVersion);
 
         var result = await sender.Send(command, ct);
 
@@ -190,7 +193,8 @@ public sealed class WorkOrdersController(ISender sender) : ApiController
     {
         var command = new UpdateWorkOrderStateCommand(
             workOrderId,
-            (WorkOrderState)(int)request.State);
+            (WorkOrderState)(int)request.State,
+            request.RowVersion);
 
         var result = await sender.Send(command, ct);
 
@@ -206,7 +210,7 @@ public sealed class WorkOrdersController(ISender sender) : ApiController
         ModifyRepairTaskRequest request,
         CancellationToken ct)
     {
-        var command = new UpdateWorkOrderRepairTasksCommand(workOrderId, request.RepairTaskIds);
+        var command = new UpdateWorkOrderRepairTasksCommand(workOrderId, request.RepairTaskIds, request.RowVersion);
 
         var result = await sender.Send(command, ct);
 
@@ -223,11 +227,38 @@ public sealed class WorkOrdersController(ISender sender) : ApiController
         "Deletes the specified work order permanently. Only users with the Manager role are authorized.")]
     [EndpointName("DeleteWorkOrder")]
     [MapToApiVersion("1.0")]
-    public async Task<IActionResult> Delete(Guid workOrderId, CancellationToken ct)
+    public async Task<IActionResult> Delete(
+        Guid workOrderId,
+        [FromHeader(Name = "If-Match")] string? ifMatch,
+        CancellationToken ct)
     {
-        var result = await sender.Send(new DeleteWorkOrderCommand(workOrderId), ct);
+        if (!TryParseRowVersion(ifMatch, out var rowVersion))
+        {
+            return BadRequest("A valid If-Match RowVersion is required.");
+        }
+
+        var result = await sender.Send(new DeleteWorkOrderCommand(workOrderId, rowVersion), ct);
 
         return result.Match(_ => NoContent(), Problem);
+    }
+
+    private static bool TryParseRowVersion(string? value, out byte[] rowVersion)
+    {
+        rowVersion = [];
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return false;
+        }
+
+        try
+        {
+            rowVersion = Convert.FromBase64String(value.Trim().Trim('"'));
+            return rowVersion.Length == 8;
+        }
+        catch (FormatException)
+        {
+            return false;
+        }
     }
 
     [HttpGet("schedule/{date}")]

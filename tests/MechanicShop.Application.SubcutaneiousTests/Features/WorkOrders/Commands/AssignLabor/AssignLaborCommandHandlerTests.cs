@@ -24,7 +24,7 @@ public class AssignLaborCommandHandlerTests(WebAppFactory factory)
     public async Task Handle_WhenWorkOrderDoesNotExist_ShouldReturnError()
     {
         var result = await _mediator.Send(
-            new AssignLaborCommand(Guid.NewGuid(), Guid.NewGuid()),
+            new AssignLaborCommand(Guid.NewGuid(), Guid.NewGuid(), new byte[8]),
             TestContext.Current.CancellationToken);
 
         Assert.True(result.IsError);
@@ -36,7 +36,7 @@ public class AssignLaborCommandHandlerTests(WebAppFactory factory)
         var order = await CreateWorkOrderAsync();
 
         var result = await _mediator.Send(
-            new AssignLaborCommand(order.Id, Guid.NewGuid()),
+            new AssignLaborCommand(order.Id, Guid.NewGuid(), order.RowVersion),
             TestContext.Current.CancellationToken);
 
         Assert.True(result.IsError);
@@ -51,11 +51,22 @@ public class AssignLaborCommandHandlerTests(WebAppFactory factory)
         var order = await CreateWorkOrderAsync();
         var newLabor = EmployeeFactory.CreateLabor().Value;
         await _context.Employees.AddAsync(newLabor, TestContext.Current.CancellationToken);
+        await _context.EmployeeBranchMemberships.AddAsync(
+            MechanicShop.Domain.Branches.EmployeeBranchMembership.Create(
+                newLabor.Id, MechanicShop.Tests.Common.Branches.TestBranchIds.Main, false).Value,
+            TestContext.Current.CancellationToken);
         await _context.SaveChangesAsync(TestContext.Current.CancellationToken);
         factory.WorkOrderNotifier.Clear();
+        factory.WorkOrderNotifier.OnNotify = async _ =>
+        {
+            var savedOrder = await _context.WorkOrders.AsNoTracking().SingleAsync(
+                item => item.Id == order.Id,
+                TestContext.Current.CancellationToken);
+            Assert.Equal(newLabor.Id, savedOrder.LaborId);
+        };
 
         var result = await _mediator.Send(
-            new AssignLaborCommand(order.Id, newLabor.Id),
+            new AssignLaborCommand(order.Id, newLabor.Id, order.RowVersion),
             TestContext.Current.CancellationToken);
 
         var persisted = await _context.WorkOrders.AsNoTracking().SingleAsync(
@@ -76,10 +87,14 @@ public class AssignLaborCommandHandlerTests(WebAppFactory factory)
             includeLabor: false);
         var labor = EmployeeFactory.CreateLabor().Value;
         await _context.Employees.AddAsync(labor, TestContext.Current.CancellationToken);
+        await _context.EmployeeBranchMemberships.AddAsync(
+            MechanicShop.Domain.Branches.EmployeeBranchMembership.Create(
+                labor.Id, MechanicShop.Tests.Common.Branches.TestBranchIds.Main, false).Value,
+            TestContext.Current.CancellationToken);
         await _context.SaveChangesAsync(TestContext.Current.CancellationToken);
 
         var result = await _mediator.Send(
-            new AssignLaborCommand(order.Id, labor.Id),
+            new AssignLaborCommand(order.Id, labor.Id, order.RowVersion),
             TestContext.Current.CancellationToken);
 
         var persisted = await _context.WorkOrders.AsNoTracking().SingleAsync(
@@ -99,7 +114,7 @@ public class AssignLaborCommandHandlerTests(WebAppFactory factory)
             TestContext.Current.CancellationToken);
 
         var result = await _mediator.Send(
-            new AssignLaborCommand(targetOrder.Id, occupiedOrder.LaborId!.Value),
+            new AssignLaborCommand(targetOrder.Id, occupiedOrder.LaborId!.Value, targetOrder.RowVersion),
             TestContext.Current.CancellationToken);
 
         var persisted = await _context.WorkOrders.AsNoTracking().SingleAsync(

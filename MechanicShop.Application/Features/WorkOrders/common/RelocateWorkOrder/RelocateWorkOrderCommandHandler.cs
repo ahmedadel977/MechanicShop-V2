@@ -1,6 +1,7 @@
 using MechanicShop.Application.Common.Errors;
 using MechanicShop.Application.Common.Interfaces;
 using MechanicShop.Domain.Common.Results;
+using MechanicShop.Domain.Workorders;
 using MechanicShop.Domain.Workorders.Events;
 
 using MediatR;
@@ -89,10 +90,16 @@ public class RelocateWorkOrderCommandHandler(
             return updateSpotResult.Errors;
         }
 
-        workOrder.AddDomainEvent(new WorkOrderCollectionModified());
-
-        await _context.SaveChangesAsync(ct);
-
+        _context.WorkOrders.Entry(workOrder).Property(order => order.RowVersion).OriginalValue = command.RowVersion!;
+        try
+        {
+            workOrder.AddDomainEvent(new WorkOrderCollectionModified());
+            await _context.SaveChangesAsync(ct);
+        }
+        catch (DbUpdateConcurrencyException)
+        {
+            return WorkOrderErrors.ConcurrencyConflict;
+        }
         await _cache.RemoveByTagAsync("work-order", ct);
 
         return Result.Updated;

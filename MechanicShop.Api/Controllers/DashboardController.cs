@@ -13,6 +13,7 @@ namespace MechanicShop.Api.Controllers;
 
 [ApiVersion("1.0")]
 [Authorize]
+[Authorize(Policy = "ActiveBranchAccess")]
 [Route("api/v{version:apiVersion}/dashboard")]
 public sealed class DashboardController(ISender sender) : ApiController
 {

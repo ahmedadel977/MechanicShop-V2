@@ -18,7 +18,7 @@ public class UpdateWorkOrderRepairTasksCommandHandlerTests(WebAppFactory factory
     public async Task Handle_WhenWorkOrderDoesNotExist_ShouldReturnNotFound()
     {
         var result = await _mediator.Send(
-            new UpdateWorkOrderRepairTasksCommand(Guid.NewGuid(), [Guid.NewGuid()]),
+            new UpdateWorkOrderRepairTasksCommand(Guid.NewGuid(), [Guid.NewGuid()], new byte[8]),
             TestContext.Current.CancellationToken);
 
         Assert.True(result.IsError);
@@ -34,7 +34,7 @@ public class UpdateWorkOrderRepairTasksCommandHandlerTests(WebAppFactory factory
         var originalIds = order.RepairTasks.Select(task => task.Id).ToArray();
 
         var result = await _mediator.Send(
-            new UpdateWorkOrderRepairTasksCommand(order.Id, [Guid.NewGuid()]),
+            new UpdateWorkOrderRepairTasksCommand(order.Id, [Guid.NewGuid()], order.RowVersion),
             TestContext.Current.CancellationToken);
 
         var persisted = await _context.WorkOrders.AsNoTracking()
@@ -56,7 +56,7 @@ public class UpdateWorkOrderRepairTasksCommandHandlerTests(WebAppFactory factory
         var originalIds = order.RepairTasks.Select(task => task.Id).ToArray();
 
         var result = await _mediator.Send(
-            new UpdateWorkOrderRepairTasksCommand(order.Id, [replacement.Id, replacement.Id]),
+            new UpdateWorkOrderRepairTasksCommand(order.Id, [replacement.Id, replacement.Id], order.RowVersion),
             TestContext.Current.CancellationToken);
 
         var persisted = await _context.WorkOrders.AsNoTracking()
@@ -77,7 +77,7 @@ public class UpdateWorkOrderRepairTasksCommandHandlerTests(WebAppFactory factory
         await _context.SaveChangesAsync(TestContext.Current.CancellationToken);
 
         var result = await _mediator.Send(
-            new UpdateWorkOrderRepairTasksCommand(order.Id, [replacement.Id]),
+            new UpdateWorkOrderRepairTasksCommand(order.Id, [replacement.Id], order.RowVersion),
             TestContext.Current.CancellationToken);
 
         var persisted = await _context.WorkOrders.AsNoTracking()
@@ -100,7 +100,7 @@ public class UpdateWorkOrderRepairTasksCommandHandlerTests(WebAppFactory factory
         await _context.SaveChangesAsync(TestContext.Current.CancellationToken);
 
         var result = await _mediator.Send(
-            new UpdateWorkOrderRepairTasksCommand(order.Id, [replacement.Id]),
+            new UpdateWorkOrderRepairTasksCommand(order.Id, [replacement.Id], order.RowVersion),
             TestContext.Current.CancellationToken);
 
         var persisted = await _context.WorkOrders.AsNoTracking()

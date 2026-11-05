@@ -1,5 +1,6 @@
 ﻿using MechanicShop.Application.Common.Interfaces;
 using MechanicShop.Domain.Common;
+using MechanicShop.Domain.Branches;
 using MechanicShop.Domain.Customers;
 using MechanicShop.Domain.Customers.Vehicles;
 using MechanicShop.Domain.Employees;
@@ -16,8 +17,13 @@ using Microsoft.EntityFrameworkCore;
 
 namespace MechanicShop.Infrastructure.Date;
 
-public class AppDbContext(DbContextOptions<AppDbContext> options, IMediator mediator) : IdentityDbContext<AppUser>(options), IAppDbContext
+public class AppDbContext(
+    DbContextOptions<AppDbContext> options,
+    IMediator mediator,
+    ICurrentBranchContext currentBranchContext) : IdentityDbContext<AppUser>(options), IAppDbContext
 {
+    public DbSet<Branch> Branches => Set<Branch>();
+    public DbSet<EmployeeBranchMembership> EmployeeBranchMemberships => Set<EmployeeBranchMembership>();
     public DbSet<Customer> Customers => Set<Customer>();
     public DbSet<Part> Parts => Set<Part>();
     public DbSet<RepairTask> RepairTasks => Set<RepairTask>();
@@ -26,30 +32,67 @@ public class AppDbContext(DbContextOptions<AppDbContext> options, IMediator medi
     public DbSet<Invoice> Invoices => Set<Invoice>();
     public DbSet<Employee> Employees => Set<Employee>();
     public DbSet<RefreshToken> RefreshTokens => Set<RefreshToken>();
+    public Guid? CurrentBranchId => currentBranchContext.BranchId;
+    public Guid? CurrentEmployeeId => currentBranchContext.EmployeeId;
+    public bool IsCompanyWide => currentBranchContext.IsCompanyWide;
+    public bool IsLabor => currentBranchContext.IsLabor;
+
+    public Task<Microsoft.EntityFrameworkCore.Storage.IDbContextTransaction> BeginTransactionAsync(
+        CancellationToken cancellationToken)
+        => Database.BeginTransactionAsync(cancellationToken);
 
     public override async Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
     {
-        await DispatchDomainEventsAsync(cancellationToken);
-        return await base.SaveChangesAsync(cancellationToken);
+        var domainEntities = ChangeTracker.Entries()
+            .Where(entry => entry.Entity is Entity entity && entity.DomainEvents.Count != 0)
+            .Select(entry => (Entity)entry.Entity)
+            .ToList();
+        var domainEvents = domainEntities.SelectMany(entity => entity.DomainEvents).ToList();
+
+        int rowsAffected;
+        try
+        {
+            rowsAffected = await base.SaveChangesAsync(cancellationToken);
+        }
+        catch
+        {
+            foreach (var entity in domainEntities)
+            {
+                entity.ClearDomainEvents();
+            }
+
+            throw;
+        }
+
+        await DispatchDomainEventsAsync(domainEntities, domainEvents, cancellationToken);
+        return rowsAffected;
     }
 
     protected override void OnModelCreating(ModelBuilder builder)
     {
         base.OnModelCreating(builder);
         builder.ApplyConfigurationsFromAssembly(typeof(AppDbContext).Assembly);
+        builder.Entity<WorkOrder>()
+            .HasQueryFilter(workOrder =>
+                (IsCompanyWide && Branches.Any(branch =>
+                    branch.Id == workOrder.BranchId && branch.IsActive))
+                || (!IsCompanyWide
+                    && CurrentBranchId.HasValue
+                    && workOrder.BranchId == CurrentBranchId.GetValueOrDefault()));
+        builder.Entity<Invoice>()
+            .HasQueryFilter(invoice => invoice.WorkOrder != null
+                && ((IsCompanyWide && Branches.Any(branch =>
+                        branch.Id == invoice.WorkOrder.BranchId && branch.IsActive))
+                    || (!IsCompanyWide
+                        && CurrentBranchId.HasValue
+                        && invoice.WorkOrder.BranchId == CurrentBranchId.GetValueOrDefault())));
     }
 
-    private async Task DispatchDomainEventsAsync(CancellationToken cancellationToken)
+    private async Task DispatchDomainEventsAsync(
+        IReadOnlyCollection<Entity> domainEntities,
+        IReadOnlyCollection<INotification> domainEvents,
+        CancellationToken cancellationToken)
     {
-        var domainEntities = ChangeTracker.Entries()
-            .Where(e => e.Entity is Entity baseEntity && baseEntity.DomainEvents.Count != 0)
-            .Select(e => (Entity)e.Entity)
-            .ToList();
-
-        var domainEvents = domainEntities
-            .SelectMany(e => e.DomainEvents)
-            .ToList();
-
         foreach (var domainEvent in domainEvents)
         {
             await mediator.Publish(domainEvent, cancellationToken);
@@ -57,9 +100,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options, IMediator medi
 
         foreach (var entity in domainEntities)
         {
-            entity.ClearDomainEvents
-                
-                 ();
+            entity.ClearDomainEvents();
         }
     }
 }

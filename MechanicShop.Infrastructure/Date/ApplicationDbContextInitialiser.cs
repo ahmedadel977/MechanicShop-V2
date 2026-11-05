@@ -1,5 +1,6 @@
 using MechanicShop.Domain.Customers;
 using MechanicShop.Domain.Customers.Vehicles;
+using MechanicShop.Domain.Branches;
 using MechanicShop.Domain.Employees;
 using MechanicShop.Domain.Identity;
 using MechanicShop.Domain.RepairTasks;
@@ -15,24 +16,50 @@ using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Hosting;
 
 namespace MechanicShop.Infrastructure.Date;
 
 public class ApplicationDbContextInitialiser(
     ILogger<ApplicationDbContextInitialiser> logger,
     AppDbContext context, UserManager<AppUser> userManager,
-    RoleManager<IdentityRole> roleManager)
+    RoleManager<IdentityRole> roleManager,
+    IHostEnvironment environment,
+    IConfiguration configuration,
+    CompanyManagerBootstrapper companyManagerBootstrapper)
 {
     private readonly ILogger<ApplicationDbContextInitialiser> _logger = logger;
     private readonly AppDbContext _context = context;
     private readonly UserManager<AppUser> _userManager = userManager;
     private readonly RoleManager<IdentityRole> _roleManager = roleManager;
+    private readonly IHostEnvironment _environment = environment;
+    private readonly IConfiguration _configuration = configuration;
+    private readonly CompanyManagerBootstrapper _companyManagerBootstrapper = companyManagerBootstrapper;
 
     public async Task InitialiseAsync()
     {
         try
         {
-            await _context.Database.EnsureCreatedAsync();
+            if (_configuration.GetValue<bool>("Database:ResetOnStartup"))
+            {
+                if (!_environment.IsDevelopment() && !_environment.IsEnvironment("Testing"))
+                {
+                    throw new InvalidOperationException("إعادة إنشاء قاعدة البيانات مسموحة في Development وTesting فقط.");
+                }
+
+                var databaseName = _context.Database.GetDbConnection().Database;
+                if (new[] { "master", "model", "msdb", "tempdb" }
+                    .Contains(databaseName, StringComparer.OrdinalIgnoreCase))
+                {
+                    throw new InvalidOperationException("إعادة ضبط قواعد بيانات SQL Server النظامية ممنوعة.");
+                }
+
+                await _context.Database.EnsureDeletedAsync();
+            }
+
+            await _context.Database.MigrateAsync();
         }
         catch (Exception ex)
         {
@@ -56,123 +83,37 @@ public class ApplicationDbContextInitialiser(
 
     public async Task TrySeedAsync()
     {
-        // Default roles
-        var managerRole = new IdentityRole(nameof(Role.Manager));
+        await SeedBranchesAsync();
 
-        if (_roleManager.Roles.All(r => r.Name != managerRole.Name))
+        await EnsureRoleAsync(Role.Manager);
+        await EnsureRoleAsync(Role.Labor);
+
+        await EnsureEmployeeAsync("b6327240-0aea-46fc-863a-777fc4e42560", "John", "S.", Role.Labor);
+        await EnsureEmployeeAsync("8104ab20-26c2-4651-b1de-c0baf04dbbd9", "Peter", "R.", Role.Labor);
+        await EnsureEmployeeAsync("e17c83de-1089-4f19-bf79-5f789133d37f", "Kevin", "M.", Role.Labor);
+        await EnsureEmployeeAsync("54cd01ba-b9ae-4c14-bab6-f3df0219ba4c", "Suzan", "L.", Role.Labor);
+
+        if (_environment.IsEnvironment("Testing"))
         {
-            await _roleManager.CreateAsync(managerRole);
+            await EnsureTestAccountAsync(
+                "19a59129-6c20-417a-834d-11a208d32d96", "pm@localhost", "Primary", "Manager", Role.Manager, AccessScope.Company);
+            await EnsureTestAccountAsync(
+                "b6327240-0aea-46fc-863a-777fc4e42560", "john.labor@localhost", "John", "S.", Role.Labor, AccessScope.Branch);
+            await EnsureTestAccountAsync(
+                "8104ab20-26c2-4651-b1de-c0baf04dbbd9", "peter.labor@localhost", "Peter", "R.", Role.Labor, AccessScope.Branch);
+            await EnsureTestAccountAsync(
+                "e17c83de-1089-4f19-bf79-5f789133d37f", "kevin.labor@localhost", "Kevin", "M.", Role.Labor, AccessScope.Branch);
+            await EnsureTestAccountAsync(
+                "54cd01ba-b9ae-4c14-bab6-f3df0219ba4c", "suzan.labor@localhost", "Suzan", "L.", Role.Labor, AccessScope.Branch);
+        }
+        else if (_environment.IsDevelopment())
+        {
+            await _companyManagerBootstrapper.BootstrapAsync(CancellationToken.None);
         }
 
-        var laborRole = new IdentityRole(nameof(Role.Labor));
+        await _context.SaveChangesAsync(CancellationToken.None);
 
-        if (_roleManager.Roles.All(r => r.Name != laborRole.Name))
-        {
-            await _roleManager.CreateAsync(laborRole);
-        }
-
-        // Default users
-        var manager = new AppUser
-        {
-            Id = "19a59129-6c20-417a-834d-11a208d32d96",
-            Email = "pm@localhost",
-            UserName = "pm@localhost",
-            EmailConfirmed = true
-        };
-
-        if (_userManager.Users.All(u => u.Email != manager.Email))
-        {
-            await _userManager.CreateAsync(manager, manager.Email);
-
-            if (!string.IsNullOrWhiteSpace(managerRole.Name))
-            {
-                await _userManager.AddToRolesAsync(manager, [managerRole.Name]);
-            }
-        }
-
-        var labor01 = new AppUser
-        {
-            Id = "b6327240-0aea-46fc-863a-777fc4e42560",
-            Email = "john.labor@localhost",
-            UserName = "john.labor@localhost",
-            EmailConfirmed = true
-        };
-
-        if (_userManager.Users.All(u => u.Email != labor01.Email))
-        {
-            await _userManager.CreateAsync(labor01, labor01.Email);
-
-            if (!string.IsNullOrWhiteSpace(laborRole.Name))
-            {
-                await _userManager.AddToRolesAsync(labor01, [laborRole.Name]);
-            }
-        }
-
-        var labor02 = new AppUser
-        {
-            Id = "8104ab20-26c2-4651-b1de-c0baf04dbbd9",
-            Email = "peter.labor@localhost",
-            UserName = "peter.labor@localhost",
-            EmailConfirmed = true
-        };
-
-        if (_userManager.Users.All(u => u.Email != labor02.Email))
-        {
-            await _userManager.CreateAsync(labor02, labor02.Email);
-
-            if (!string.IsNullOrWhiteSpace(laborRole.Name))
-            {
-                await _userManager.AddToRolesAsync(labor02, [laborRole.Name]);
-            }
-        }
-
-        var labor03 = new AppUser
-        {
-            Id = "e17c83de-1089-4f19-bf79-5f789133d37f",
-            Email = "kevin.labor@localhost",
-            UserName = "kevin.labor@localhost",
-            EmailConfirmed = true
-        };
-
-        if (_userManager.Users.All(u => u.Email != labor03.Email))
-        {
-            await _userManager.CreateAsync(labor03, labor03.Email);
-
-            if (!string.IsNullOrWhiteSpace(laborRole.Name))
-            {
-                await _userManager.AddToRolesAsync(labor03, [laborRole.Name]);
-            }
-        }
-
-        var labor04 = new AppUser
-        {
-            Id = "54cd01ba-b9ae-4c14-bab6-f3df0219ba4c",
-            Email = "suzan.labor@localhost",
-            UserName = "suzan.labor@localhost",
-            EmailConfirmed = true
-        };
-
-        if (_userManager.Users.All(u => u.Email != labor04.Email))
-        {
-            await _userManager.CreateAsync(labor04, labor04.Email);
-
-            if (!string.IsNullOrWhiteSpace(laborRole.Name))
-            {
-                await _userManager.AddToRolesAsync(labor04, [laborRole.Name]);
-            }
-        }
-
-        if (!_context.Employees.Any())
-        {
-            _context.Employees.AddRange(
-            [
-                Employee.Create(Guid.Parse(manager.Id), "Primary", "Manager", Role.Manager).Value,
-                Employee.Create(Guid.Parse(labor01.Id), "John", "S.", Role.Labor).Value,
-                Employee.Create(Guid.Parse(labor02.Id), "Peter", "R.", Role.Labor).Value,
-                Employee.Create(Guid.Parse(labor03.Id), "Kevin", "M.", Role.Labor).Value,
-                Employee.Create(Guid.Parse(labor04.Id), "Suzan", "L.", Role.Labor).Value
-            ]);
-        }
+        await SeedEmployeeBranchMembershipsAsync();
 
         if (!_context.Customers.Any())
         {
@@ -206,159 +147,193 @@ public class ApplicationDbContextInitialiser(
 
         await _context.SaveChangesAsync();
 
-        if (!_context.WorkOrders.Any())
+        await SeedWorkOrdersAsync();
+    }
+    private async Task SeedBranchesAsync()
+    {
+        var branches = new[]
         {
-            var repairTasks = _context.RepairTasks.ToList();
-            var vehicles = _context.Vehicles.ToList();
-            string[] labors = [labor01.Id, labor02.Id, labor03.Id, labor04.Id];
-            Spot[] spots = [Spot.A, Spot.B, Spot.C, Spot.D];
+            Branch.Create(SeedDataIds.MainBranch, "Central Workshop", "MAIN").Value,
+            Branch.Create(SeedDataIds.NorthBranch, "North Workshop", "NORTH").Value
+        };
 
-            var generatedWorkOrders = new List<WorkOrder>();
-            Random random = new();
-            DateTimeOffset startDate = DateTimeOffset.Now.Date.AddDays(1); // Start from tomorrow
-            DateTimeOffset endDate = startDate.AddMonths(1); // Generate for the next month
-            TimeSpan openTime = TimeSpan.FromHours(12);  // 9:00 am utc -4
-            TimeSpan closeTime = TimeSpan.FromHours(23); // 18:00 am utc -4
-            int totalMinutes = (int)(closeTime - openTime).TotalMinutes;
-
-            while (startDate < endDate)
+        foreach (var branch in branches)
+        {
+            if (!await _context.Branches.AnyAsync(item => item.Id == branch.Id))
             {
-                foreach (Spot spot in spots)
-                {
-                    int occupiedMinutes = 0;
-                    int minOccupancy = (int)(totalMinutes * 0.6); // Minimum 60% usage
-                    int maxOccupancy = (int)(totalMinutes * 0.8); // Maximum 80% usage
-                    List<WorkOrder> spotWorkOrders = [];
+                await _context.Branches.AddAsync(branch);
+            }
+        }
 
-                    DateTimeOffset currentTime = startDate.Add(openTime);
+        await _context.SaveChangesAsync(CancellationToken.None);
+    }
 
-                    while (occupiedMinutes < minOccupancy && currentTime.TimeOfDay < closeTime)
-                    {
-                        var selectedTask = repairTasks
-                                            .DistinctBy(t => t.Id)
-                                            .OrderBy(_ => Guid.NewGuid())
-                                            .Take(Random.Shared.Next(1, Math.Min(4, repairTasks.Select(t => t.Id).Distinct().Count())))
-                                            .ToList();
-                        var laborId = labors[random.Next(labors.Length)];
-                        var duration = selectedTask.Sum(st => (int)st.EstimatedDurationInMins);
+    private async Task EnsureRoleAsync(Role role)
+    {
+        var roleName = role.ToString();
+        if (await _roleManager.RoleExistsAsync(roleName))
+        {
+            return;
+        }
 
-                        if (occupiedMinutes + duration > maxOccupancy)
-                        {
-                            break;
-                        }
+        var result = await _roleManager.CreateAsync(new IdentityRole(roleName));
+        if (!result.Succeeded)
+        {
+            throw new InvalidOperationException(
+                $"Could not create the {roleName} identity role. Error codes: {string.Join(",", result.Errors.Select(error => error.Code))}.");
+        }
+    }
 
-                        DateTimeOffset startAt = currentTime;
-                        DateTimeOffset endAt = startAt.AddMinutes(duration);
+    private async Task EnsureTestAccountAsync(
+        string id,
+        string email,
+        string firstName,
+        string lastName,
+        Role role,
+        AccessScope accessScope)
+    {
+        var user = await _userManager.FindByEmailAsync(email);
+        if (user is null)
+        {
+            user = new AppUser
+            {
+                Id = id,
+                Email = email,
+                UserName = email,
+                EmailConfirmed = true
+            };
 
-                        var availableVehicle = vehicles
-                        .Where(v => !generatedWorkOrders.Any(w =>
-                            w.VehicleId == v.Id &&
-                            w.StartAtUtc.Date == startAt.Date &&
-                            w.StartAtUtc < endAt &&
-                            w.EndAtUtc > startAt))
-                        .OrderBy(_ => Guid.NewGuid())
-                        .FirstOrDefault();
+            var createResult = await _userManager.CreateAsync(user, email);
+            if (!createResult.Succeeded)
+            {
+                throw new InvalidOperationException(
+                    $"Could not create a test identity user. Error codes: {string.Join(",", createResult.Errors.Select(error => error.Code))}.");
+            }
+        }
+        else if (!string.Equals(user.Id, id, StringComparison.Ordinal))
+        {
+            throw new InvalidOperationException("A test identity email is already associated with another user ID.");
+        }
 
-                        if (availableVehicle == null)
-                        {
-                            break;
-                        }
+        if (!await _userManager.IsInRoleAsync(user, role.ToString()))
+        {
+            var roleResult = await _userManager.AddToRoleAsync(user, role.ToString());
+            if (!roleResult.Succeeded)
+            {
+                throw new InvalidOperationException(
+                    $"Could not assign a test identity role. Error codes: {string.Join(",", roleResult.Errors.Select(error => error.Code))}.");
+            }
+        }
 
-                        if (endAt.TimeOfDay > closeTime)
-                        {
-                            break;
-                        }
+        await EnsureEmployeeAsync(id, firstName, lastName, role, accessScope);
+    }
 
-                        var workOrder = WorkOrder.Create(
-                            Guid.NewGuid(),
-                            availableVehicle.Id,
-                            startAt,
-                            endAt,
-                            Guid.Parse(laborId),
-                            spot,
-                            selectedTask);
-
-                        spotWorkOrders.Add(workOrder.Value);
-                        occupiedMinutes += duration;
-
-                        currentTime = startDate.Add(openTime).AddMinutes(occupiedMinutes);
-                    }
-
-                    // Ensure at least 60% occupancy is reached for this spot before adding WorkOrders
-                    if (occupiedMinutes >= minOccupancy)
-                    {
-                        generatedWorkOrders.AddRange(spotWorkOrders);
-                    }
-                }
-
-                startDate = startDate.AddDays(1);
+    private async Task EnsureEmployeeAsync(string id, string firstName, string lastName, Role role, AccessScope accessScope = AccessScope.Branch)
+    {
+        var employeeId = Guid.Parse(id);
+        if (!await _context.Employees.AnyAsync(employee => employee.Id == employeeId))
+        {
+            var employee = Employee.Create(employeeId, firstName, lastName, role, accessScope);
+            if (employee.IsError)
+            {
+                throw new InvalidOperationException(employee.TopError.Description);
             }
 
-            var repairTasksForFirstOrder = _context.RepairTasks
-             .OrderBy(_ => Guid.NewGuid())
-             .Take(2)
-             .ToList();
-
-            var utcNow = DateTimeOffset.UtcNow;
-
-            // Round down to nearest 30-minute block
-            var floored = new DateTimeOffset(
-                  utcNow.Year,
-                  utcNow.Month,
-                  utcNow.Day,
-                  utcNow.Hour,
-                  utcNow.Minute - (utcNow.Minute % 15),
-                  0,
-                  TimeSpan.Zero); // keep in UTC
-
-            var startTimeFirstOrder = floored;
-
-            var workOrderStartingNow = WorkOrder.Create(
-                Guid.NewGuid(),
-                _context.Vehicles.OrderBy(_ => Guid.NewGuid()).First().Id,
-                startTimeFirstOrder,
-                startTimeFirstOrder.AddMinutes(repairTasksForFirstOrder.Sum(rt => (int)rt.EstimatedDurationInMins)),
-                Guid.Parse(labor01.Id),
-                Spot.A,
-                repairTasksForFirstOrder).Value;
-
-            workOrderStartingNow.UpdateState(WorkOrderState.InProgress);
-
-            var repairTasksEndingNow = _context.RepairTasks
-      .First(rt => rt.EstimatedDurationInMins == RepairDurationInMinutes.Min60);
-
-            // Align to 15-minute slot: started 45 minutes ago
-            var startedAgo = utcNow.AddMinutes(-45);
-            var roundedStart = new DateTimeOffset(
-                startedAgo.Year,
-                startedAgo.Month,
-                startedAgo.Day,
-                startedAgo.Hour,
-                startedAgo.Minute - (startedAgo.Minute % 15),
-                0,
-                TimeSpan.Zero);
-
-            var endTimeSecondOrder = roundedStart.AddMinutes((int)repairTasksEndingNow.EstimatedDurationInMins);
-
-            WorkOrder value = WorkOrder.Create(
-                Guid.NewGuid(),
-                _context.Vehicles.OrderBy(_ => Guid.NewGuid()).First().Id,
-                roundedStart,
-                endTimeSecondOrder,
-                Guid.Parse(labor02.Id),
-                Spot.B,
-                [repairTasksEndingNow])
-            .Value;
-            var workOrderEndingNow = value;
-
-            workOrderEndingNow.UpdateState(WorkOrderState.InProgress);
-
-            generatedWorkOrders.AddRange(workOrderStartingNow, workOrderEndingNow);
-
-            _context.WorkOrders.AddRange(generatedWorkOrders);
-
-            await _context.SaveChangesAsync();
+            await _context.Employees.AddAsync(employee.Value);
         }
+    }
+
+    private async Task SeedEmployeeBranchMembershipsAsync()
+    {
+        var memberships = new List<(Guid EmployeeId, Guid BranchId, bool IsDefault)>
+        {
+            (EmployeeId: Guid.Parse("b6327240-0aea-46fc-863a-777fc4e42560"), BranchId: SeedDataIds.MainBranch, IsDefault: true),
+            (EmployeeId: Guid.Parse("b6327240-0aea-46fc-863a-777fc4e42560"), BranchId: SeedDataIds.NorthBranch, IsDefault: false),
+            (EmployeeId: Guid.Parse("e17c83de-1089-4f19-bf79-5f789133d37f"), BranchId: SeedDataIds.MainBranch, IsDefault: true),
+            (EmployeeId: Guid.Parse("e17c83de-1089-4f19-bf79-5f789133d37f"), BranchId: SeedDataIds.NorthBranch, IsDefault: false),
+            (EmployeeId: Guid.Parse("8104ab20-26c2-4651-b1de-c0baf04dbbd9"), BranchId: SeedDataIds.MainBranch, IsDefault: false),
+            (EmployeeId: Guid.Parse("8104ab20-26c2-4651-b1de-c0baf04dbbd9"), BranchId: SeedDataIds.NorthBranch, IsDefault: true),
+            (EmployeeId: Guid.Parse("54cd01ba-b9ae-4c14-bab6-f3df0219ba4c"), BranchId: SeedDataIds.MainBranch, IsDefault: false),
+            (EmployeeId: Guid.Parse("54cd01ba-b9ae-4c14-bab6-f3df0219ba4c"), BranchId: SeedDataIds.NorthBranch, IsDefault: true)
+        };
+
+        var testManagerId = Guid.Parse("19a59129-6c20-417a-834d-11a208d32d96");
+        if (await _context.Employees.AnyAsync(employee => employee.Id == testManagerId))
+        {
+            memberships.Add((testManagerId, SeedDataIds.MainBranch, true));
+            memberships.Add((testManagerId, SeedDataIds.NorthBranch, false));
+        }
+
+        foreach (var item in memberships)
+        {
+            if (await _context.Employees.AnyAsync(employee => employee.Id == item.EmployeeId)
+                && !await _context.EmployeeBranchMemberships.AnyAsync(membership =>
+                    membership.EmployeeId == item.EmployeeId && membership.BranchId == item.BranchId))
+            {
+                var membership = EmployeeBranchMembership.Create(item.EmployeeId, item.BranchId, item.IsDefault);
+                if (membership.IsError)
+                {
+                    throw new InvalidOperationException(membership.TopError.Description);
+                }
+
+                await _context.EmployeeBranchMemberships.AddAsync(membership.Value);
+            }
+        }
+
+        await _context.SaveChangesAsync(CancellationToken.None);
+    }
+
+    private async Task SeedWorkOrdersAsync()
+    {
+        var tomorrow = new DateTimeOffset(DateTime.UtcNow.Date.AddDays(1), TimeSpan.Zero);
+        var now = DateTimeOffset.UtcNow;
+        var oilChange = await _context.RepairTasks.SingleAsync(task => task.Id == Guid.Parse("616aebb1-d515-4b40-8d47-8d5c0b67a313"));
+        var brakeReplacement = await _context.RepairTasks.SingleAsync(task => task.Id == Guid.Parse("4fa0be55-06f6-4616-b086-e1f0c9354cd8"));
+        var vehicles = await _context.Vehicles.OrderBy(vehicle => vehicle.Id).Take(4).ToListAsync();
+        if (vehicles.Count != 4)
+        {
+            throw new InvalidOperationException("Development seed data requires four vehicles.");
+        }
+
+        var seedWorkOrders = new[]
+        {
+            (Id: SeedDataIds.MainWorkOrderTomorrow, BranchId: SeedDataIds.MainBranch, VehicleId: vehicles[0].Id, LaborId: Guid.Parse("b6327240-0aea-46fc-863a-777fc4e42560"), StartAt: tomorrow.AddHours(9), Task: oilChange, State: WorkOrderState.Scheduled, Spot: Spot.A),
+            (Id: SeedDataIds.MainWorkOrderInProgress, BranchId: SeedDataIds.MainBranch, VehicleId: vehicles[1].Id, LaborId: Guid.Parse("e17c83de-1089-4f19-bf79-5f789133d37f"), StartAt: now.AddMinutes(-30), Task: oilChange, State: WorkOrderState.InProgress, Spot: Spot.B),
+            (Id: SeedDataIds.NorthWorkOrderTomorrow, BranchId: SeedDataIds.NorthBranch, VehicleId: vehicles[2].Id, LaborId: Guid.Parse("8104ab20-26c2-4651-b1de-c0baf04dbbd9"), StartAt: tomorrow.AddHours(11), Task: brakeReplacement, State: WorkOrderState.Scheduled, Spot: Spot.A),
+            (Id: SeedDataIds.NorthWorkOrderInProgress, BranchId: SeedDataIds.NorthBranch, VehicleId: vehicles[3].Id, LaborId: Guid.Parse("54cd01ba-b9ae-4c14-bab6-f3df0219ba4c"), StartAt: now.AddMinutes(-30), Task: oilChange, State: WorkOrderState.InProgress, Spot: Spot.B)
+        };
+
+        foreach (var seed in seedWorkOrders)
+        {
+            if (await _context.WorkOrders.IgnoreQueryFilters().AnyAsync(workOrder => workOrder.Id == seed.Id))
+            {
+                continue;
+            }
+
+            var workOrder = WorkOrder.Create(
+                seed.Id,
+                seed.BranchId,
+                seed.VehicleId,
+                seed.StartAt,
+                seed.StartAt.AddMinutes((int)seed.Task.EstimatedDurationInMins),
+                seed.LaborId,
+                seed.Spot,
+                [seed.Task]);
+
+            if (workOrder.IsError)
+            {
+                throw new InvalidOperationException(workOrder.TopError.Description);
+            }
+
+            if (seed.State == WorkOrderState.InProgress)
+            {
+                workOrder.Value.UpdateState(WorkOrderState.InProgress);
+            }
+
+            await _context.WorkOrders.AddAsync(workOrder.Value);
+        }
+
+        await _context.SaveChangesAsync(CancellationToken.None);
     }
 }
 

@@ -80,7 +80,14 @@ namespace MechanicShop.Infrastructure.identity
         {
             new (JwtRegisteredClaimNames.Sub, user.UserId!),
             new (JwtRegisteredClaimNames.Email, user.Email!),
+
+            new ("access_scope", user.AccessScope.ToString()),
         };
+
+            if (user.BranchId.HasValue)
+            {
+                claims.Add(new Claim("branch_id", user.BranchId.Value.ToString()));
+            }
 
             foreach (var role in user.Roles)
             {

@@ -19,5 +19,6 @@ public class EmployeeConfiguration : IEntityTypeConfiguration<Employee>
                .HasMaxLength(50);
 
         builder.Property(e => e.Role).HasConversion<string>().IsRequired();
+        builder.Property(e => e.AccessScope).HasConversion<string>().HasMaxLength(20).IsRequired();
     }
 }

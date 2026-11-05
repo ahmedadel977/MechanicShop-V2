@@ -116,14 +116,51 @@ public class RefreshTokenQueryHandlerTests(WebAppFactory factory)
     [Fact]
     public async Task Handle_WhenAccessTokenReferencesMissingUser_ShouldReturnNotFound()
     {
+        var missingUserId = Guid.NewGuid().ToString();
+        var refreshToken = await AddRefreshTokenAsync(missingUserId);
         var result = await _mediator.Send(
             new RefreshTokenQuery(
-                "unused-refresh-token",
-                CreateAccessToken(Guid.NewGuid().ToString(), DateTime.UtcNow.AddMinutes(-5))),
+                refreshToken,
+                CreateAccessToken(missingUserId, DateTime.UtcNow.AddMinutes(-5))),
             TestContext.Current.CancellationToken);
 
         Assert.True(result.IsError);
         Assert.Equal("Auth.User.NotFound", result.Errors[0].Code);
+    }
+
+    [Fact]
+    public async Task Handle_WhenCompanyManagerTokenHasNoBranchClaim_ShouldRefreshWithoutAddingBranchClaim()
+    {
+        var user = await GetManagerAsync();
+        var managerId = Guid.Parse(user.UserId);
+        var memberships = await _context.EmployeeBranchMemberships
+            .Where(membership => membership.EmployeeId == managerId)
+            .ToListAsync(TestContext.Current.CancellationToken);
+        _context.EmployeeBranchMemberships.RemoveRange(memberships);
+        await _context.SaveChangesAsync(TestContext.Current.CancellationToken);
+
+        try
+        {
+            var refreshToken = await AddRefreshTokenAsync(user.UserId);
+            var expiredAccessToken = CreateAccessToken(
+                user.UserId,
+                DateTime.UtcNow.AddMinutes(-5),
+                branchId: null);
+
+            var result = await _mediator.Send(
+                new RefreshTokenQuery(refreshToken, expiredAccessToken),
+                TestContext.Current.CancellationToken);
+
+            Assert.True(result.IsSuccess);
+            var principal = new JwtSecurityTokenHandler().ReadJwtToken(result.Value.AccessToken);
+            Assert.Equal("Company", principal.Claims.Single(claim => claim.Type == "access_scope").Value);
+            Assert.DoesNotContain(principal.Claims, claim => claim.Type == "branch_id");
+        }
+        finally
+        {
+            _context.EmployeeBranchMemberships.AddRange(memberships);
+            await _context.SaveChangesAsync(TestContext.Current.CancellationToken);
+        }
     }
 
     private async Task<AppUserDto> GetManagerAsync()
@@ -148,12 +185,17 @@ public class RefreshTokenQueryHandlerTests(WebAppFactory factory)
         return token;
     }
 
-    private string CreateAccessToken(string? userId, DateTime expiresAtUtc)
+    private string CreateAccessToken(string? userId, DateTime expiresAtUtc, Guid? branchId = null)
     {
         var configuration = factory.Services.GetRequiredService<IConfiguration>().GetSection("JwtSettings");
         var claims = userId is null
             ? Array.Empty<Claim>()
-            : [new Claim(ClaimTypes.NameIdentifier, userId)];
+            : branchId.HasValue
+                ? [
+                    new Claim(ClaimTypes.NameIdentifier, userId),
+                    new Claim("branch_id", branchId.Value.ToString())
+                  ]
+                : [new Claim(ClaimTypes.NameIdentifier, userId)];
         var token = new JwtSecurityToken(
             issuer: configuration["Issuer"],
             audience: configuration["Audience"],

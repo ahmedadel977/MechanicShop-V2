@@ -28,7 +28,7 @@ public class AssignLaborCommandValidatorTests
     [Fact]
     public void Validate_WhenBothIdsAreValid_ShouldSucceed()
     {
-        var result = _validator.TestValidate(new AssignLaborCommand(Guid.NewGuid(), Guid.NewGuid()));
+        var result = _validator.TestValidate(new AssignLaborCommand(Guid.NewGuid(), Guid.NewGuid(), new byte[8]));
 
         result.ShouldNotHaveAnyValidationErrors();
     }

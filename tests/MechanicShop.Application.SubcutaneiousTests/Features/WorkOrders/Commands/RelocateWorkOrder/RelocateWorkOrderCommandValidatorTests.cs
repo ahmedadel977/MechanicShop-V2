@@ -36,7 +36,7 @@ public class RelocateWorkOrderCommandValidatorTests
     [Fact]
     public void Validate_WhenCommandIsValid_ShouldSucceed()
     {
-        var result = _validator.TestValidate(new RelocateWorkOrderCommand(Guid.NewGuid(), DateTimeOffset.UtcNow.AddDays(1), Spot.A));
+        var result = _validator.TestValidate(new RelocateWorkOrderCommand(Guid.NewGuid(), DateTimeOffset.UtcNow.AddDays(1), Spot.A, new byte[8]));
 
         result.ShouldNotHaveAnyValidationErrors();
     }

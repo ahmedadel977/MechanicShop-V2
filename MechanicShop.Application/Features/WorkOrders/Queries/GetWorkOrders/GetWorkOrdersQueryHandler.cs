@@ -47,6 +47,8 @@ public class GetWorkOrdersQueryHandler(IAppDbContext context)
               .Select(wo => new WorkOrderListItemDto
               {
                   WorkOrderId = wo.Id,
+                  BranchId = wo.BranchId,
+                  RowVersion = wo.RowVersion,
                   InvoiceId = wo.Invoice == null ? null : wo.Invoice.Id,
                   Spot = wo.Spot,
                   StartAtUtc = wo.StartAtUtc,

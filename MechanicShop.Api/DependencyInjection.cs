@@ -48,7 +48,8 @@ public static class DependencyInjection
         {
             options.SizeLimit = 100 * 1024 * 1024; // 100 mb
             options.AddBasePolicy(policy =>
-                policy.Expire(TimeSpan.FromSeconds(60)));
+                policy.Expire(TimeSpan.FromSeconds(60))
+                    .SetVaryByHeader("Authorization"));
         });
 
         return services;

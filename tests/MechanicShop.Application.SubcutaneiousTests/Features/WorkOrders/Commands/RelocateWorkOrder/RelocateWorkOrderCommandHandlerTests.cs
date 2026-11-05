@@ -21,7 +21,7 @@ public class RelocateWorkOrderCommandHandlerTests(WebAppFactory factory)
     public async Task Handle_WhenWorkOrderDoesNotExist_ShouldReturnError()
     {
         var result = await _mediator.Send(
-            new RelocateWorkOrderCommand(Guid.NewGuid(), DateTimeOffset.UtcNow.AddDays(2), Spot.B),
+            new RelocateWorkOrderCommand(Guid.NewGuid(), DateTimeOffset.UtcNow.AddDays(2), Spot.B, new byte[8]),
             TestContext.Current.CancellationToken);
 
         Assert.True(result.IsError);
@@ -36,9 +36,17 @@ public class RelocateWorkOrderCommandHandlerTests(WebAppFactory factory)
         var duration = order.EndAtUtc - order.StartAtUtc;
         var newStart = new DateTimeOffset(order.StartAtUtc.Date, order.StartAtUtc.Offset).AddDays(1).AddHours(11);
         factory.WorkOrderNotifier.Clear();
+        factory.WorkOrderNotifier.OnNotify = async _ =>
+        {
+            var savedOrder = await _context.WorkOrders.AsNoTracking().SingleAsync(
+                item => item.Id == order.Id,
+                TestContext.Current.CancellationToken);
+            Assert.Equal(newStart, savedOrder.StartAtUtc);
+            Assert.Equal(Spot.B, savedOrder.Spot);
+        };
 
         var result = await _mediator.Send(
-            new RelocateWorkOrderCommand(order.Id, newStart, Spot.B),
+            new RelocateWorkOrderCommand(order.Id, newStart, Spot.B, order.RowVersion),
             TestContext.Current.CancellationToken);
 
         var persisted = await _context.WorkOrders.AsNoTracking().SingleAsync(
@@ -61,7 +69,7 @@ public class RelocateWorkOrderCommandHandlerTests(WebAppFactory factory)
         var newStart = order.StartAtUtc.AddDays(1);
 
         var result = await _mediator.Send(
-            new RelocateWorkOrderCommand(order.Id, newStart, Spot.B),
+            new RelocateWorkOrderCommand(order.Id, newStart, Spot.B, order.RowVersion),
             TestContext.Current.CancellationToken);
 
         var persisted = await _context.WorkOrders.AsNoTracking().SingleAsync(
@@ -83,7 +91,7 @@ public class RelocateWorkOrderCommandHandlerTests(WebAppFactory factory)
         var repairTask = RepairTaskFactory.CreateRepairTask().Value;
         var start = occupied.StartAtUtc.AddHours(2);
         var target = WorkOrder.Create(
-            Guid.NewGuid(), vehicle.Id, start, start.AddHours(1), occupied.LaborId, Spot.B, [repairTask]).Value;
+            Guid.NewGuid(), MechanicShop.Tests.Common.Branches.TestBranchIds.Main, vehicle.Id, start, start.AddHours(1), occupied.LaborId, Spot.B, [repairTask]).Value;
         target.Vehicle = vehicle;
         target.Labor = occupied.Labor;
         await _context.Customers.AddAsync(customer, TestContext.Current.CancellationToken);
@@ -92,7 +100,7 @@ public class RelocateWorkOrderCommandHandlerTests(WebAppFactory factory)
         await _context.SaveChangesAsync(TestContext.Current.CancellationToken);
 
         var result = await _mediator.Send(
-            new RelocateWorkOrderCommand(target.Id, occupied.StartAtUtc, Spot.C),
+            new RelocateWorkOrderCommand(target.Id, occupied.StartAtUtc, Spot.C, target.RowVersion),
             TestContext.Current.CancellationToken);
 
         var persisted = await _context.WorkOrders.AsNoTracking().SingleAsync(
@@ -114,7 +122,7 @@ public class RelocateWorkOrderCommandHandlerTests(WebAppFactory factory)
         var repairTask = RepairTaskFactory.CreateRepairTask().Value;
         var start = occupied.StartAtUtc.AddHours(2);
         var target = WorkOrder.Create(
-            Guid.NewGuid(), occupied.VehicleId, start, start.AddHours(1), labor.Id, Spot.B, [repairTask]).Value;
+            Guid.NewGuid(), MechanicShop.Tests.Common.Branches.TestBranchIds.Main, occupied.VehicleId, start, start.AddHours(1), labor.Id, Spot.B, [repairTask]).Value;
         target.Vehicle = occupied.Vehicle;
         target.Labor = labor;
         await _context.Employees.AddAsync(labor, TestContext.Current.CancellationToken);
@@ -123,7 +131,7 @@ public class RelocateWorkOrderCommandHandlerTests(WebAppFactory factory)
         await _context.SaveChangesAsync(TestContext.Current.CancellationToken);
 
         var result = await _mediator.Send(
-            new RelocateWorkOrderCommand(target.Id, occupied.StartAtUtc, Spot.C),
+            new RelocateWorkOrderCommand(target.Id, occupied.StartAtUtc, Spot.C, target.RowVersion),
             TestContext.Current.CancellationToken);
 
         var persisted = await _context.WorkOrders.AsNoTracking().SingleAsync(
@@ -147,7 +155,7 @@ public class RelocateWorkOrderCommandHandlerTests(WebAppFactory factory)
             TestContext.Current.CancellationToken);
 
         var result = await _mediator.Send(
-            new RelocateWorkOrderCommand(targetOrder.Id, occupiedOrder.StartAtUtc, occupiedOrder.Spot),
+            new RelocateWorkOrderCommand(targetOrder.Id, occupiedOrder.StartAtUtc, occupiedOrder.Spot, targetOrder.RowVersion),
             TestContext.Current.CancellationToken);
 
         var persisted = await _context.WorkOrders.AsNoTracking().SingleAsync(

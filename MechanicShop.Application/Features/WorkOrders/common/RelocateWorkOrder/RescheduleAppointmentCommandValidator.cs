@@ -15,5 +15,11 @@ public sealed class RescheduleAppointmentCommandValidator : AbstractValidator<Re
 
         RuleFor(x => x.NewSpot)
             .IsInEnum();
+
+        RuleFor(x => x.RowVersion)
+            .NotNull()
+            .Must(rowVersion => rowVersion is { Length: 8 })
+            .WithErrorCode("WorkOrderRowVersion_Required")
+            .WithMessage("A valid WorkOrder RowVersion is required.");
     }
 }

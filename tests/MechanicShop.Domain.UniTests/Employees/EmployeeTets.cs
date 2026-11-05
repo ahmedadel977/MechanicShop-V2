@@ -127,4 +127,63 @@ public class EmployeeTests
         Assert.True(result.IsSuccess);
         Assert.Equal(Role.Manager, result.Value.Role);
     }
+
+    [Fact]
+    public void CreateEmployee_ShouldDefaultToBranchScope()
+    {
+        var employee = Employee.Create(Guid.NewGuid(), "Mona", "Ali", Role.Manager).Value;
+
+        Assert.Equal(AccessScope.Branch, employee.AccessScope);
+    }
+
+    [Fact]
+    public void CreateEmployee_ShouldAllowCompanyScopeForManager()
+    {
+        var employee = Employee.Create(
+            Guid.NewGuid(), "Mona", "Ali", Role.Manager, AccessScope.Company).Value;
+
+        Assert.Equal(AccessScope.Company, employee.AccessScope);
+    }
+
+    [Fact]
+    public void CreateEmployee_ShouldRejectCompanyScopeForLabor()
+    {
+        var result = Employee.Create(
+            Guid.NewGuid(), "Mona", "Ali", Role.Labor, AccessScope.Company);
+
+        Assert.True(result.IsError);
+        Assert.Equal("Employee.AccessScope.Invalid", result.TopError.Code);
+    }
+
+    [Fact]
+    public void CreateEmployee_ShouldRejectUndefinedAccessScope()
+    {
+        var result = Employee.Create(
+            Guid.NewGuid(), "Mona", "Ali", Role.Manager, (AccessScope)999);
+
+        Assert.True(result.IsError);
+        Assert.Equal("Employee.AccessScope.Invalid", result.TopError.Code);
+    }
+
+    [Fact]
+    public void SetAccessScope_ShouldAllowCompanyScopeForManager()
+    {
+        var employee = Employee.Create(Guid.NewGuid(), "Mona", "Ali", Role.Manager).Value;
+
+        var result = employee.SetAccessScope(AccessScope.Company);
+
+        Assert.False(result.IsError);
+        Assert.Equal(AccessScope.Company, employee.AccessScope);
+    }
+
+    [Fact]
+    public void SetAccessScope_ShouldRejectCompanyScopeForLabor()
+    {
+        var employee = Employee.Create(Guid.NewGuid(), "Mona", "Ali", Role.Labor).Value;
+
+        var result = employee.SetAccessScope(AccessScope.Company);
+
+        Assert.True(result.IsError);
+        Assert.Equal(AccessScope.Branch, employee.AccessScope);
+    }
 }

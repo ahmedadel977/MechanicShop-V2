@@ -15,14 +15,14 @@ public class GenerateTokenQueryhandler (IIdentityService identityService, IToken
 
     public async Task<Result<TokenResponse>> Handle(GenerateTokenQuery context, CancellationToken cancellationToken)
     {
-      var userResponse  = await  _identityService.AuthenticateAsync(context.Email, context.Password);
+      var userResponse  = await  _identityService.AuthenticateAsync(context.Email, context.Password, cancellationToken);
         if (userResponse.IsError)
         {
             _logger.LogWarning("Authentication failed for user {Email}. Errors: {Errors}", context.Email, userResponse.Errors);
             return userResponse.Errors;
         }
 
-        var token = await _tokenProvider.GenerateJwtTokenAsync(userResponse.Value);
+        var token = await _tokenProvider.GenerateJwtTokenAsync(userResponse.Value, cancellationToken);
         if (token.IsError)
         {
             _logger.LogError("Generate token error occurred: {ErrorDescription}", token.TopError.Description);

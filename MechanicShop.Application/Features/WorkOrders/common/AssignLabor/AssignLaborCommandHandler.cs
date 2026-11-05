@@ -1,6 +1,7 @@
 using MechanicShop.Application.Common.Errors;
 using MechanicShop.Application.Common.Interfaces;
 using MechanicShop.Domain.Common.Results;
+using MechanicShop.Domain.Workorders;
 using MechanicShop.Domain.Workorders.Events;
 
 using MediatR;
@@ -43,6 +44,13 @@ public class AssignLaborCommandHandler(
             return ApplicationErrors.LaborNotFound;
         }
 
+        if (!await _context.EmployeeBranchMemberships.AnyAsync(
+                membership => membership.EmployeeId == command.LaborId && membership.BranchId == workOrder.BranchId,
+                ct))
+        {
+            return Error.Conflict("Labor.Branch.Mismatch", "الفني مش تابع لفرع أمر الشغل.");
+        }
+
         if (await _workOrderValidator.IsLaborOccupied(command.LaborId, command.WorkOrderId, workOrder.StartAtUtc, workOrder.EndAtUtc))
         {
             _logger.LogError("Labor with Id '{LaborId}' is already occupied during the requested time.", workOrder.LaborId);
@@ -61,8 +69,16 @@ public class AssignLaborCommandHandler(
             return updateLaborResult.Errors;
         }
 
-        workOrder.AddDomainEvent(new WorkOrderCollectionModified());
-        await _context.SaveChangesAsync(ct);
+        _context.WorkOrders.Entry(workOrder).Property(order => order.RowVersion).OriginalValue = command.RowVersion!;
+        try
+        {
+            workOrder.AddDomainEvent(new WorkOrderCollectionModified());
+            await _context.SaveChangesAsync(ct);
+        }
+        catch (DbUpdateConcurrencyException)
+        {
+            return WorkOrderErrors.ConcurrencyConflict;
+        }
 
         await _cache.RemoveByTagAsync("work-order", ct);
 

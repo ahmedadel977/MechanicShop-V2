@@ -15,6 +15,8 @@ public static class WorkOrderMapper
         return new WorkOrderDto
         {
             WorkOrderId = entity.Id,
+            BranchId = entity.BranchId,
+            RowVersion = entity.RowVersion,
             Spot = entity.Spot,
             StartAtUtc = entity.StartAtUtc,
             EndAtUtc = entity.EndAtUtc,
@@ -47,6 +49,8 @@ public static class WorkOrderMapper
         return new WorkOrderListItemDto
         {
             WorkOrderId = entity.Id,
+            BranchId = entity.BranchId,
+            RowVersion = entity.RowVersion,
             Spot = entity.Spot,
             StartAtUtc = entity.StartAtUtc,
             EndAtUtc = entity.EndAtUtc,

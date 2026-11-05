@@ -5,6 +5,7 @@ using MechanicShop.Application.SubcutaneousTests.Common;
 using MechanicShop.Infrastructure.BackGroundJobs;
 using MechanicShop.Infrastructure.Date;
 using MechanicShop.Infrastructure.Settings;
+using MechanicShop.Tests.Common.Branches;
 
 using MediatR;
 
@@ -13,6 +14,7 @@ using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.TestHost;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
+using Microsoft.Data.SqlClient;
 using Microsoft.Extensions.Caching.Distributed;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
@@ -60,9 +62,11 @@ public class WebAppFactory : WebApplicationFactory<IAssemblyMarker>, IAsyncLifet
 
         using var scope = Services.CreateScope();
         var context = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var initializer = scope.ServiceProvider.GetRequiredService<ApplicationDbContextInitialiser>();
+        await initializer.InitialiseAsync();
+        await initializer.SeedAsync();
 
-        context.WorkOrders.RemoveRange(context.WorkOrders);
-        await context.SaveChangesAsync();
+        await context.WorkOrders.IgnoreQueryFilters().ExecuteDeleteAsync(TestContext.Current.CancellationToken);
     }
 
     public new async Task DisposeAsync()
@@ -78,10 +82,13 @@ public class WebAppFactory : WebApplicationFactory<IAssemblyMarker>, IAsyncLifet
 
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
+        builder.UseEnvironment("Testing");
         builder.ConfigureTestServices(services =>
         {
             services.RemoveAll<IHostedService>();
             services.RemoveAll<OverdueBookingCleanupService>();
+            services.RemoveAll<ICurrentBranchContext>();
+            services.AddScoped<ICurrentBranchContext, TestCurrentBranchContext>();
 
             // تستخدم Application handlers الـHybridCache؛ نستخدم Cache داخل العملية بدلًا من Redis خارجي.
             services.RemoveAll<IDistributedCache>();
@@ -99,7 +106,11 @@ public class WebAppFactory : WebApplicationFactory<IAssemblyMarker>, IAsyncLifet
             services.AddDbContext<AppDbContext>((sp, options) =>
             {
                 options.AddInterceptors(sp.GetServices<ISaveChangesInterceptor>());
-                options.UseSqlServer(_dbContainer.GetConnectionString());
+                var connectionString = new SqlConnectionStringBuilder(_dbContainer.GetConnectionString())
+                {
+                    InitialCatalog = "MechanicShopSubcutaneousTests"
+                }.ConnectionString;
+                options.UseSqlServer(connectionString);
             });
 
             services.RemoveAll<AppSettings>();

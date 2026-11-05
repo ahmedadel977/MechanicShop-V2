@@ -13,6 +13,8 @@ public class CreateWorkOrderRequest
     [Required(ErrorMessage = "Vehicle is required.")]
     public Guid VehicleId { get; set; }
 
+    public Guid? BranchId { get; set; }
+
     [MinLength(1, ErrorMessage = "At least one repair task must be selected.")]
     public List<Guid> RepairTaskIds { get; set; } = [];
 

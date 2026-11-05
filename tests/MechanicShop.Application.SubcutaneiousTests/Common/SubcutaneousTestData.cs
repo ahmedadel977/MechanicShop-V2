@@ -3,6 +3,7 @@ using MechanicShop.Domain.Customers.Vehicles;
 using MechanicShop.Domain.Employees;
 using MechanicShop.Domain.RepairTasks;
 using MechanicShop.Domain.Workorders;
+using MechanicShop.Domain.Branches;
 using MechanicShop.Tests.Common.Customers;
 using MechanicShop.Tests.Common.Employees;
 using MechanicShop.Tests.Common.RepaireTasks;
@@ -29,6 +30,7 @@ internal static class SubcutaneousTestData
             .AddHours(10);
         var workOrder = WorkOrder.Create(
             Guid.NewGuid(),
+            MechanicShop.Tests.Common.Branches.TestBranchIds.Main,
             vehicle.Id,
             start,
             start.AddHours(1),
@@ -43,6 +45,11 @@ internal static class SubcutaneousTestData
         if (labor is not null)
         {
             await context.Employees.AddAsync(labor, cancellationToken);
+            var membership = EmployeeBranchMembership.Create(
+                labor.Id,
+                MechanicShop.Tests.Common.Branches.TestBranchIds.Main,
+                false).Value;
+            await context.EmployeeBranchMemberships.AddAsync(membership, cancellationToken);
         }
         await context.RepairTasks.AddAsync(task, cancellationToken);
         await context.WorkOrders.AddAsync(workOrder, cancellationToken);

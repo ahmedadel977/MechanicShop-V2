@@ -14,6 +14,7 @@ namespace MechanicShop.Api.Controllers;
 [Route("api/v{version:apiVersion}/labors")]
 [ApiVersion("1.0")]
 [Authorize]
+[Authorize(Policy = "ActiveBranchAccess")]
 public sealed class LaborsController(ISender sender) : ApiController
 {
     [HttpGet]
@@ -23,7 +24,7 @@ public sealed class LaborsController(ISender sender) : ApiController
     [EndpointDescription("Returns all labor records associated with the system, accessible only to users with the Manager role.")]
     [EndpointName("GetLabors")]
     [MapToApiVersion("1.0")]
-    [OutputCache(Duration = 60)]
+    [OutputCache(Duration = 60, VaryByHeaderNames = ["Authorization"])]
     public async Task<IActionResult> Get(CancellationToken ct)
     {
         var result = await sender.Send(new GetLaborsQuery(), ct);

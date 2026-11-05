@@ -6,4 +6,5 @@ public class AssignLaborRequest
 {
     [Required(ErrorMessage = "LaborId is required.")]
     public string LaborId { get; set; } = string.Empty;
+    public byte[]? RowVersion { get; set; }
 }

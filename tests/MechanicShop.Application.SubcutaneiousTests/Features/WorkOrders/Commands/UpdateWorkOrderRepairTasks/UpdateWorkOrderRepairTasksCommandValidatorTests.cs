@@ -28,7 +28,7 @@ public class UpdateWorkOrderRepairTasksCommandValidatorTests
     [Fact]
     public void Validate_WhenRequiredValuesAreProvided_ShouldSucceed()
     {
-        var result = _validator.TestValidate(new UpdateWorkOrderRepairTasksCommand(Guid.NewGuid(), [Guid.NewGuid()]));
+        var result = _validator.TestValidate(new UpdateWorkOrderRepairTasksCommand(Guid.NewGuid(), [Guid.NewGuid()], new byte[8]));
 
         result.ShouldNotHaveAnyValidationErrors();
     }

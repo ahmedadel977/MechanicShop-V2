@@ -15,5 +15,11 @@ public sealed class UpdateWorkOrderRepairTasksCommandValidator : AbstractValidat
           .NotEmpty()
           .WithErrorCode("RepairTasks_Required")
           .WithMessage("At least one repair task must be provided.");
+
+        RuleFor(x => x.RowVersion)
+            .NotNull()
+            .Must(rowVersion => rowVersion is { Length: 8 })
+            .WithErrorCode("WorkOrderRowVersion_Required")
+            .WithMessage("A valid WorkOrder RowVersion is required.");
     }
 }

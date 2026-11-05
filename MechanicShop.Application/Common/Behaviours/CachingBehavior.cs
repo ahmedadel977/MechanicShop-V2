@@ -11,21 +11,24 @@ namespace MechanicShop.Application.Common.Behaviours
 {
     public class CachingBehavior<TRequest, TResponse>(
         ILogger<CachingBehavior<TRequest, TResponse>> logger,
-        HybridCache cache)
+        HybridCache cache,
+        ICurrentBranchContext? currentBranchContext = null)
         : IPipelineBehavior<TRequest, TResponse>
         where TRequest : notnull
     {
         private readonly HybridCache _cache = cache;
         private readonly ILogger<CachingBehavior<TRequest, TResponse>> _logger = logger;
+        private readonly ICurrentBranchContext? _currentBranchContext = currentBranchContext;
         public async Task<TResponse> Handle(TRequest request, RequestHandlerDelegate<TResponse> next, CancellationToken ct)
         {
             if (request is not ICachedQuery cacheableRequest)
             {
                 return await next();
             }
+            var cacheKey = BuildCacheKey(cacheableRequest.CacheKey);
             _logger.LogInformation("Checking cache for {RequestName}", typeof(TRequest).Name);
             var result = await _cache.GetOrCreateAsync<TResponse>(
-                cacheableRequest.CacheKey,
+                cacheKey,
                 _ => new ValueTask<TResponse>((TResponse)(object)null!),
                 new HybridCacheEntryOptions
                 {
@@ -40,7 +43,7 @@ namespace MechanicShop.Application.Common.Behaviours
                 if ( result is IResult res && res.IsSuccess)
                 {
                     await _cache.SetAsync(
-                  cacheableRequest.CacheKey,
+                  cacheKey,
                   result,
                   new HybridCacheEntryOptions
                   {
@@ -58,6 +61,21 @@ namespace MechanicShop.Application.Common.Behaviours
             }
             return result;
 
+        }
+
+        private string BuildCacheKey(string key)
+        {
+            if (_currentBranchContext is null)
+            {
+                return key;
+            }
+
+            var scope = _currentBranchContext.IsCompanyWide ? "company" : "branch";
+            var branchId = _currentBranchContext.BranchId?.ToString("N") ?? "none";
+            var identityPartition = _currentBranchContext.IsLabor
+                ? $"labor:{_currentBranchContext.EmployeeId?.ToString("N") ?? "none"}"
+                : "management";
+            return $"{scope}:{branchId}:{identityPartition}:{key}";
         }
     }
 }

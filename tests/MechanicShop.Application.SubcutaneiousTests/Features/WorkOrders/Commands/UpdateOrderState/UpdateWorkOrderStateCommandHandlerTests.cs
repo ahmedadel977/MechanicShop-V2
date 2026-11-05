@@ -17,7 +17,7 @@ public class UpdateWorkOrderStateCommandHandlerTests(WebAppFactory factory)
     public async Task Handle_WhenWorkOrderDoesNotExist_ShouldReturnError()
     {
         var result = await _mediator.Send(
-            new UpdateWorkOrderStateCommand(Guid.NewGuid(), WorkOrderState.InProgress),
+            new UpdateWorkOrderStateCommand(Guid.NewGuid(), WorkOrderState.InProgress, new byte[8]),
             TestContext.Current.CancellationToken);
 
         Assert.True(result.IsError);
@@ -32,7 +32,7 @@ public class UpdateWorkOrderStateCommandHandlerTests(WebAppFactory factory)
             TestContext.Current.CancellationToken);
 
         var result = await _mediator.Send(
-            new UpdateWorkOrderStateCommand(order.Id, WorkOrderState.InProgress),
+            new UpdateWorkOrderStateCommand(order.Id, WorkOrderState.InProgress, order.RowVersion),
             TestContext.Current.CancellationToken);
 
         var persisted = await _context.WorkOrders.AsNoTracking().SingleAsync(
@@ -51,7 +51,7 @@ public class UpdateWorkOrderStateCommandHandlerTests(WebAppFactory factory)
             TestContext.Current.CancellationToken);
 
         var result = await _mediator.Send(
-            new UpdateWorkOrderStateCommand(order.Id, WorkOrderState.InProgress),
+            new UpdateWorkOrderStateCommand(order.Id, WorkOrderState.InProgress, order.RowVersion),
             TestContext.Current.CancellationToken);
 
         var persisted = await _context.WorkOrders.AsNoTracking().SingleAsync(
@@ -71,7 +71,7 @@ public class UpdateWorkOrderStateCommandHandlerTests(WebAppFactory factory)
             TestContext.Current.CancellationToken);
 
         var result = await _mediator.Send(
-            new UpdateWorkOrderStateCommand(order.Id, WorkOrderState.Completed),
+            new UpdateWorkOrderStateCommand(order.Id, WorkOrderState.Completed, order.RowVersion),
             TestContext.Current.CancellationToken);
 
         Assert.True(result.IsError);
@@ -91,13 +91,14 @@ public class UpdateWorkOrderStateCommandHandlerTests(WebAppFactory factory)
         factory.Notifications.Clear();
 
         var started = await _mediator.Send(
-            new UpdateWorkOrderStateCommand(order.Id, WorkOrderState.InProgress),
+            new UpdateWorkOrderStateCommand(order.Id, WorkOrderState.InProgress, order.RowVersion),
             TestContext.Current.CancellationToken);
         Assert.False(started.IsError);
+        await _context.WorkOrders.Entry(order).ReloadAsync(TestContext.Current.CancellationToken);
         factory.WorkOrderNotifier.Clear();
 
         var completed = await _mediator.Send(
-            new UpdateWorkOrderStateCommand(order.Id, WorkOrderState.Completed),
+            new UpdateWorkOrderStateCommand(order.Id, WorkOrderState.Completed, order.RowVersion),
             TestContext.Current.CancellationToken);
 
         Assert.False(completed.IsError);
@@ -115,16 +116,21 @@ public class UpdateWorkOrderStateCommandHandlerTests(WebAppFactory factory)
             TestContext.Current.CancellationToken);
         factory.Notifications.Clear();
         var started = await _mediator.Send(
-            new UpdateWorkOrderStateCommand(order.Id, WorkOrderState.InProgress),
+            new UpdateWorkOrderStateCommand(order.Id, WorkOrderState.InProgress, order.RowVersion),
             TestContext.Current.CancellationToken);
+        if (!started.IsError)
+        {
+            await _context.WorkOrders.Entry(order).ReloadAsync(TestContext.Current.CancellationToken);
+        }
         var completed = await _mediator.Send(
-            new UpdateWorkOrderStateCommand(order.Id, WorkOrderState.Completed),
+            new UpdateWorkOrderStateCommand(order.Id, WorkOrderState.Completed, order.RowVersion),
             TestContext.Current.CancellationToken);
         Assert.False(started.IsError);
         Assert.False(completed.IsError);
+        await _context.WorkOrders.Entry(order).ReloadAsync(TestContext.Current.CancellationToken);
 
         var repeated = await _mediator.Send(
-            new UpdateWorkOrderStateCommand(order.Id, WorkOrderState.Completed),
+            new UpdateWorkOrderStateCommand(order.Id, WorkOrderState.Completed, order.RowVersion),
             TestContext.Current.CancellationToken);
 
         Assert.True(repeated.IsError);
@@ -133,5 +139,36 @@ public class UpdateWorkOrderStateCommandHandlerTests(WebAppFactory factory)
         Assert.Equal(WorkOrderState.Completed, (await _context.WorkOrders.AsNoTracking().SingleAsync(
             item => item.Id == order.Id,
             TestContext.Current.CancellationToken)).State);
+    }
+
+    [Fact]
+    public async Task Handle_WhenRowVersionIsStale_ShouldRejectUpdateWithoutDispatchingSideEffects()
+    {
+        var order = await SubcutaneousTestData.CreateWorkOrderAsync(
+            _context,
+            DateTimeOffset.UtcNow.AddHours(-2),
+            TestContext.Current.CancellationToken);
+        var staleRowVersion = order.RowVersion.ToArray();
+
+        var firstUpdate = await _mediator.Send(
+            new UpdateWorkOrderStateCommand(order.Id, WorkOrderState.InProgress, staleRowVersion),
+            TestContext.Current.CancellationToken);
+        Assert.False(firstUpdate.IsError);
+        factory.Notifications.Clear();
+        factory.WorkOrderNotifier.Clear();
+
+        var staleUpdate = await _mediator.Send(
+            new UpdateWorkOrderStateCommand(order.Id, WorkOrderState.Completed, staleRowVersion),
+            TestContext.Current.CancellationToken);
+
+        Assert.True(staleUpdate.IsError);
+        Assert.Equal("WorkOrderErrors.ConcurrencyConflict", staleUpdate.TopError.Code);
+        Assert.Empty(factory.Notifications.Emails);
+        Assert.Empty(factory.Notifications.SmsMessages);
+        Assert.Equal(0, factory.WorkOrderNotifier.CallCount);
+        var persisted = await _context.WorkOrders.AsNoTracking().SingleAsync(
+            item => item.Id == order.Id,
+            TestContext.Current.CancellationToken);
+        Assert.Equal(WorkOrderState.InProgress, persisted.State);
     }
 }

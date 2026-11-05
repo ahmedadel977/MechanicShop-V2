@@ -19,7 +19,7 @@ public class DeleteWorkOrderCommandValidatorTests
     [Fact]
     public void Validate_WhenWorkOrderIdIsValid_ShouldSucceed()
     {
-        var result = _validator.TestValidate(new DeleteWorkOrderCommand(Guid.NewGuid()));
+        var result = _validator.TestValidate(new DeleteWorkOrderCommand(Guid.NewGuid(), new byte[8]));
 
         result.ShouldNotHaveAnyValidationErrors();
     }

@@ -59,8 +59,18 @@ public class UpdateWorkOrderStateCommandHandler(
             workOrder.AddDomainEvent(new WorkOrderCompleted { WorkOrderId = command.WorkOrderId });
         }
 
-        workOrder.AddDomainEvent(new WorkOrderCollectionModified());
-        await _context.SaveChangesAsync(ct);
+
+        _context.WorkOrders.Entry(workOrder).Property(order => order.RowVersion).OriginalValue = command.RowVersion!;
+        try
+        {
+            workOrder.AddDomainEvent(new WorkOrderCollectionModified());
+            await _context.SaveChangesAsync(ct);
+        }
+        catch (DbUpdateConcurrencyException)
+        {
+            return WorkOrderErrors.ConcurrencyConflict;
+        }
+
 
         await _cache.RemoveByTagAsync("work-order", ct);
 

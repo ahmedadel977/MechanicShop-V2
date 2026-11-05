@@ -6,17 +6,23 @@ public sealed class RecordingWorkOrderNotifier : IWorkOrderNotifier
 {
     public int CallCount { get; private set; }
     public CancellationToken CancellationToken { get; private set; }
+    public Func<CancellationToken, Task>? OnNotify { get; set; }
 
-    public Task NotifyWorkOrdersChangedAsync(CancellationToken ct = default)
+    public async Task NotifyWorkOrdersChangedAsync(CancellationToken ct = default)
     {
+        if (OnNotify is not null)
+        {
+            await OnNotify(ct);
+        }
+
         CallCount++;
         CancellationToken = ct;
-        return Task.CompletedTask;
     }
 
     public void Clear()
     {
         CallCount = 0;
         CancellationToken = default;
+        OnNotify = null;
     }
 }

@@ -15,5 +15,11 @@ public sealed class AssignLaborCommandValidator : AbstractValidator<AssignLaborC
            .NotEmpty()
            .WithErrorCode("LaborId_Required")
            .WithMessage("LaborId is required.");
+
+        RuleFor(x => x.RowVersion)
+            .NotNull()
+            .Must(rowVersion => rowVersion is { Length: 8 })
+            .WithErrorCode("WorkOrderRowVersion_Required")
+            .WithMessage("A valid WorkOrder RowVersion is required.");
     }
 }

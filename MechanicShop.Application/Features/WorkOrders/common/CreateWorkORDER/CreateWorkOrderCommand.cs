@@ -14,6 +14,7 @@ namespace MechanicShop.Application.Features.WorkOrders.common.CreateWorkORDER
     Guid VehicleId,
     DateTimeOffset StartAt,
     List<Guid> RepairTaskIds,
-    Guid? LaborId)
+    Guid? LaborId,
+    Guid? BranchId = null)
 : IRequest<Result<WorkOrderDto>>;
 }

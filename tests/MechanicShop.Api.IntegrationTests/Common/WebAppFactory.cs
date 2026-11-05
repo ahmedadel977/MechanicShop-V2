@@ -1,7 +1,9 @@
+using System.Collections;
 using MechanicShop.Infrastructure.identity;
 using MechanicShop.Application.Common.Interfaces;
 using MechanicShop.Infrastructure.BackGroundJobs;
 using MechanicShop.Infrastructure.Date;
+using MechanicShop.Tests.Common.Branches;
 
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
@@ -9,11 +11,13 @@ using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.TestHost;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
+using Microsoft.Data.SqlClient;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Caching.Distributed;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Hosting;
 using System.Collections.Concurrent;
+using System.Reflection;
 using System.Threading.RateLimiting;
 using Microsoft.AspNetCore.RateLimiting;
 using Testcontainers.MsSql;
@@ -63,14 +67,19 @@ public class WebAppFactory : WebApplicationFactory<IAssemblyMarker>, IAsyncLifet
     {
         await _dbContainer.StartAsync();
         await _redisContainer.StartAsync();
-        _databaseConnectionString = _dbContainer.GetConnectionString();
+        _databaseConnectionString = new SqlConnectionStringBuilder(_dbContainer.GetConnectionString())
+        {
+            InitialCatalog = "MechanicShopApiIntegrationTests"
+        }.ConnectionString;
         _redisConnectionString = $"{_redisContainer.Hostname}:{_redisContainer.GetMappedPublicPort(6379)}";
 
         using var scope = Services.CreateScope();
         var context = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var initializer = scope.ServiceProvider.GetRequiredService<ApplicationDbContextInitialiser>();
+        await initializer.InitialiseAsync();
+        await initializer.SeedAsync();
 
-        context.WorkOrders.RemoveRange(context.WorkOrders);
-        await context.SaveChangesAsync();
+        await context.WorkOrders.IgnoreQueryFilters().ExecuteDeleteAsync(TestContext.Current.CancellationToken);
     }
 
     public new async ValueTask DisposeAsync()
@@ -81,6 +90,7 @@ public class WebAppFactory : WebApplicationFactory<IAssemblyMarker>, IAsyncLifet
 
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
+        builder.UseEnvironment("Testing");
         builder.UseSetting(
             "ConnectionStrings:Redis",
             _redisConnectionString ?? $"{_redisContainer.Hostname}:{_redisContainer.GetMappedPublicPort(6379)}");
@@ -91,6 +101,15 @@ public class WebAppFactory : WebApplicationFactory<IAssemblyMarker>, IAsyncLifet
             {
                 options.GlobalLimiter = PartitionedRateLimiter.Create<HttpContext, int>(
                     _ => RateLimitPartition.GetNoLimiter(0));
+                var unactivatedPolicies = typeof(RateLimiterOptions)
+                    .GetProperty("UnactivatedPolicyMap", BindingFlags.Instance | BindingFlags.NonPublic)?
+                    .GetValue(options) as IDictionary;
+                unactivatedPolicies?.Remove("LoginPolicy");
+                var activatedPolicies = typeof(RateLimiterOptions)
+                    .GetProperty("PolicyMap", BindingFlags.Instance | BindingFlags.NonPublic)?
+                    .GetValue(options) as IDictionary;
+                activatedPolicies?.Remove("LoginPolicy");
+                options.AddPolicy("LoginPolicy", _ => RateLimitPartition.GetNoLimiter(0));
             });
 
             services.RemoveAll<IDistributedCache>();
@@ -98,13 +117,19 @@ public class WebAppFactory : WebApplicationFactory<IAssemblyMarker>, IAsyncLifet
 
             services.RemoveAll<IHostedService>();
             services.RemoveAll<OverdueBookingCleanupService>();
+            services.RemoveAll<ICurrentBranchContext>();
+            services.AddScoped<ICurrentBranchContext, TestCurrentBranchContext>();
 
             services.RemoveAll<DbContextOptions<AppDbContext>>();
 
             services.AddDbContext<AppDbContext>((sp, options) =>
             {
                 options.AddInterceptors(sp.GetServices<ISaveChangesInterceptor>());
-                options.UseSqlServer(_databaseConnectionString ?? _dbContainer.GetConnectionString());
+                var connectionString = _databaseConnectionString ?? new SqlConnectionStringBuilder(_dbContainer.GetConnectionString())
+                {
+                    InitialCatalog = "MechanicShopApiIntegrationTests"
+                }.ConnectionString;
+                options.UseSqlServer(connectionString);
             });
         });
     }

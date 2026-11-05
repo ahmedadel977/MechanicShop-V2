@@ -10,5 +10,11 @@ public sealed class DeleteWorkOrderCommandValidator : AbstractValidator<DeleteWo
            .NotEmpty()
            .WithErrorCode("WorkOrderId_Required")
            .WithMessage("WorkOrderId is required.");
+
+        RuleFor(x => x.RowVersion)
+            .NotNull()
+            .Must(rowVersion => rowVersion is { Length: 8 })
+            .WithErrorCode("WorkOrderRowVersion_Required")
+            .WithMessage("A valid WorkOrder RowVersion is required.");
     }
 }

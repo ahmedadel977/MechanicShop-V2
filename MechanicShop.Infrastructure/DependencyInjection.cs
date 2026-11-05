@@ -32,6 +32,10 @@ public static class DependencyInjection
 
 
         services.AddSingleton(TimeProvider.System);
+        services.AddHttpContextAccessor();
+        services.AddScoped<ICurrentBranchContext, CurrentBranchContext>();
+        services.AddScoped<ICurrentEmployeeAccess, CurrentEmployeeAccessService>();
+        services.AddScoped<IEmployeeAccountService, EmployeeAccountService>();
 
         var connectionString = configuration.GetConnectionString("DefaultConnection");
 
@@ -93,12 +97,20 @@ public static class DependencyInjection
         // SCOPE AUZ
 
         services.AddScoped<IAuthorizationHandler, LaborAssignedHandler>();
+        services.AddScoped<IAuthorizationHandler, ActiveBranchAccessHandler>();
 
 
         services.AddAuthorizationBuilder()
               .AddPolicy("ManagerOnly", policy => policy.RequireRole("Manager"))
               .AddPolicy("SelfScopedWorkOrderAccess", policy =>
-                policy.Requirements.Add(new LaborAssignedRequirement()));
+                policy.Requirements.Add(new LaborAssignedRequirement()))
+               .AddPolicy("CompanyOnly", policy =>
+               {
+                   policy.RequireRole("Manager");
+                   policy.RequireClaim("access_scope", "Company");
+               })
+              .AddPolicy("ActiveBranchAccess", policy =>
+                policy.Requirements.Add(new ActiveBranchAccessRequirement()));
 
         services.AddTransient<IIdentityService, IdentityService>();
         services.AddStackExchangeRedisCache(options =>
@@ -107,6 +119,7 @@ public static class DependencyInjection
             // برنامج Redis يحتاج إلى اسم فريد لتحديد مثيل التخزين المؤقت، يمكنك تغييره حسب الحاجة
             options.InstanceName = "M02";
         });
+
         services.AddHealthChecks()
          .AddRedis(
         redisConnectionString:
@@ -122,6 +135,7 @@ public static class DependencyInjection
             });
            // ادخال داتا
             services.AddScoped<ApplicationDbContextInitialiser>();
+            services.AddScoped<CompanyManagerBootstrapper>();
             services.AddScoped<IWorkOrderPolicy, WorkOrderPolicy>();
 
             services.AddScoped<ITokenProvider, TokenProvider>();

@@ -22,6 +22,67 @@ namespace MechanicShop.Infrastructure.Migrations
 
             SqlServerModelBuilderExtensions.UseIdentityColumns(modelBuilder);
 
+            modelBuilder.Entity("MechanicShop.Domain.Branches.Branch", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Code")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.Property<DateTimeOffset>("CreatedAtUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("CreatedBy")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("LastModifiedBy")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTimeOffset>("LastModifiedUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(120)
+                        .HasColumnType("nvarchar(120)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Code")
+                        .IsUnique();
+
+                    b.ToTable("Branches");
+                });
+
+            modelBuilder.Entity("MechanicShop.Domain.Branches.EmployeeBranchMembership", b =>
+                {
+                    b.Property<Guid>("EmployeeId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("BranchId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<bool>("IsDefault")
+                        .HasColumnType("bit");
+
+                    b.HasKey("EmployeeId", "BranchId");
+
+                    b.HasIndex("BranchId");
+
+                    b.HasIndex("EmployeeId")
+                        .IsUnique()
+                        .HasFilter("[IsDefault] = 1");
+
+                    b.ToTable("EmployeeBranchMemberships");
+                });
+
             modelBuilder.Entity("MechanicShop.Domain.Customers.Customer", b =>
                 {
                     b.Property<Guid>("Id")
@@ -138,6 +199,11 @@ namespace MechanicShop.Infrastructure.Migrations
                     b.Property<string>("Role")
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("AccessScope")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
 
                     b.HasKey("Id");
 
@@ -314,6 +380,9 @@ namespace MechanicShop.Infrastructure.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uniqueidentifier");
 
+                    b.Property<Guid>("BranchId")
+                        .HasColumnType("uniqueidentifier");
+
                     b.Property<DateTimeOffset>("CreatedAtUtc")
                         .HasColumnType("datetimeoffset");
 
@@ -335,6 +404,12 @@ namespace MechanicShop.Infrastructure.Migrations
 
                     b.Property<DateTimeOffset>("LastModifiedUtc")
                         .HasColumnType("datetimeoffset");
+
+                    b.Property<byte[]>("RowVersion")
+                        .IsConcurrencyToken()
+                        .IsRequired()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("rowversion");
 
                     b.Property<string>("Spot")
                         .IsRequired()
@@ -365,6 +440,8 @@ namespace MechanicShop.Infrastructure.Migrations
                     b.HasIndex("VehicleId");
 
                     b.HasIndex("StartAtUtc", "EndAtUtc");
+
+                    b.HasIndex("BranchId", "StartAtUtc", "EndAtUtc");
 
                     b.ToTable("WorkOrders");
                 });
@@ -582,6 +659,21 @@ namespace MechanicShop.Infrastructure.Migrations
                     b.ToTable("WorkOrderRepairTasks", (string)null);
                 });
 
+            modelBuilder.Entity("MechanicShop.Domain.Branches.EmployeeBranchMembership", b =>
+                {
+                    b.HasOne("MechanicShop.Domain.Branches.Branch", null)
+                        .WithMany()
+                        .HasForeignKey("BranchId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("MechanicShop.Domain.Employees.Employee", null)
+                        .WithMany()
+                        .HasForeignKey("EmployeeId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
             modelBuilder.Entity("MechanicShop.Domain.Customers.Vehicles.Vehicle", b =>
                 {
                     b.HasOne("MechanicShop.Domain.Customers.Customer", "Customer")
@@ -644,11 +736,16 @@ namespace MechanicShop.Infrastructure.Migrations
 
             modelBuilder.Entity("MechanicShop.Domain.Workorders.WorkOrder", b =>
                 {
+                    b.HasOne("MechanicShop.Domain.Branches.Branch", null)
+                        .WithMany()
+                        .HasForeignKey("BranchId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
                     b.HasOne("MechanicShop.Domain.Employees.Employee", "Labor")
                         .WithMany()
                         .HasForeignKey("LaborId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired(false);
+                        .OnDelete(DeleteBehavior.Cascade);
 
                     b.HasOne("MechanicShop.Domain.Customers.Vehicles.Vehicle", "Vehicle")
                         .WithMany()

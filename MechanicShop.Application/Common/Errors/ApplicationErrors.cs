@@ -4,6 +4,7 @@ namespace MechanicShop.Application.Common.Errors;
 
 public static class ApplicationErrors
 {
+    public static Error ActiveBranchClaimInvalid => Error.Unauthorized("Auth.BranchClaim.Invalid", "The active branch claim is missing or invalid.");
     public static Error WorkOrderOutsideOperatingHour(DateTimeOffset startAtUtc, DateTimeOffset endAtUtc) =>
     Error.Conflict(
            "ApplicationErrors.WorkOrder.Outside.OperatingHours",

@@ -29,6 +29,7 @@ public static class ProblemExtensions
             ErrorKind.Validation => StatusCodes.Status400BadRequest,
             ErrorKind.NotFound => StatusCodes.Status404NotFound,
             ErrorKind.Unauthorized => StatusCodes.Status403Forbidden,
+            ErrorKind.Forbidden => StatusCodes.Status403Forbidden,
             _ => StatusCodes.Status500InternalServerError,
         };
 

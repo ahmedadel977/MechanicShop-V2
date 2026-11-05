@@ -3,6 +3,7 @@ using MechanicShop.Domain.RepairTasks;
 using MechanicShop.Domain.Workorders;
 using MechanicShop.Domain.Workorders.Enums;
 using MechanicShop.Tests.Common.RepaireTasks;
+using MechanicShop.Tests.Common.Branches;
 
 namespace MechanicShop.Tests.Common.WorkOrders;
 
@@ -19,6 +20,7 @@ public static class WorkOrderFactory
     {
         return WorkOrder.Create(
             id ?? Guid.NewGuid(),
+            TestBranchIds.Main,
             vehicleId ?? Guid.NewGuid(),
             startAt ?? DateTimeOffset.UtcNow,
             endAt ?? DateTimeOffset.UtcNow.AddHours(1),

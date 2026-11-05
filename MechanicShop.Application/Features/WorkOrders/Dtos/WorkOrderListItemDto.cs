@@ -6,6 +6,8 @@ namespace MechanicShop.Application.Features.WorkOrders.Dtos;
 public class WorkOrderListItemDto
 {
     public Guid WorkOrderId { get; set; }
+    public Guid BranchId { get; set; }
+    public byte[] RowVersion { get; set; } = [];
     public Guid? InvoiceId { get; set; }
     public VehicleDto Vehicle { get; set; } = default!;
     public string? Customer { get; set; }

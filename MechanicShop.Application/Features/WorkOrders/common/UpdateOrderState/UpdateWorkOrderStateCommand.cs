@@ -7,4 +7,5 @@ namespace MechanicShop.Application.Features.WorkOrders.common.UpdateOrderState;
 
 public sealed record UpdateWorkOrderStateCommand(
     Guid WorkOrderId,
-    WorkOrderState State) : IRequest<Result<Updated>>;
+    WorkOrderState State,
+    byte[]? RowVersion = null) : IRequest<Result<Updated>>;

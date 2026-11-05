@@ -9,6 +9,7 @@ public sealed class Employee : AuditableEntity
     public string FirstName { get; }
     public string LastName { get; }
     public Role Role { get; }
+    public AccessScope AccessScope { get; private set; }
     public string FullName => $"{FirstName} {LastName}";
 
 #pragma warning disable CS8618 // Non-nullable field must contain a non-null value when exiting constructor. Consider adding the 'required' modifier or declaring as nullable.
@@ -17,15 +18,16 @@ public sealed class Employee : AuditableEntity
 #pragma warning restore CS8618 // Non-nullable field must contain a non-null value when exiting constructor. Consider adding the 'required' modifier or declaring as nullable.
     { }
 
-    private Employee(Guid id, string firstName, string lastName, Role role)
+    private Employee(Guid id, string firstName, string lastName, Role role, AccessScope accessScope)
         : base(id)
     {
         FirstName = firstName;
         LastName = lastName;
         Role = role;
+        AccessScope = accessScope;
     }
 
-    public static Result<Employee> Create(Guid id, string firstName, string lastName, Role role)
+    public static Result<Employee> Create(Guid id, string firstName, string lastName, Role role, AccessScope accessScope = AccessScope.Branch)
     {
         if (id == Guid.Empty)
         {
@@ -47,6 +49,22 @@ public sealed class Employee : AuditableEntity
             return EmployeeErrors.RoleInvalid;
         }
 
-        return new Employee(id, firstName.Trim(), lastName.Trim(), role);
+        if (!Enum.IsDefined(accessScope) || (accessScope == AccessScope.Company && role != Role.Manager))
+        {
+            return EmployeeErrors.AccessScopeInvalid;
+        }
+
+        return new Employee(id, firstName.Trim(), lastName.Trim(), role, accessScope);
+    }
+
+    public Result<Updated> SetAccessScope(AccessScope accessScope)
+    {
+        if (!Enum.IsDefined(accessScope) || (accessScope == AccessScope.Company && Role != Role.Manager))
+        {
+            return EmployeeErrors.AccessScopeInvalid;
+        }
+
+        AccessScope = accessScope;
+        return Result.Updated;
     }
 }

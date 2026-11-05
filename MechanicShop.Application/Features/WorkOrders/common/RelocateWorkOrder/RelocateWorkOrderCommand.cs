@@ -8,4 +8,5 @@ namespace MechanicShop.Application.Features.WorkOrders.common.RelocateWorkOrder;
 public sealed record RelocateWorkOrderCommand(
     Guid WorkOrderId,
     DateTimeOffset NewStartAt,
-    Spot NewSpot) : IRequest<Result<Updated>>;
+    Spot NewSpot,
+    byte[]? RowVersion = null) : IRequest<Result<Updated>>;

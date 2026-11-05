@@ -137,6 +137,78 @@ public class WorkOrdersControllerTests : IDisposable
     }
 
     [Fact]
+    public async Task GetWorkOrders_CompanyManagerSeesBranches_ButLaborSeesAllOrdersInDefaultBranch()
+    {
+        var mainVehicleId = await _context.Vehicles.OrderBy(vehicle => vehicle.Id)
+            .Select(vehicle => vehicle.Id).FirstAsync(TestContext.Current.CancellationToken);
+        var northVehicleId = await _context.Vehicles.OrderBy(vehicle => vehicle.Id)
+            .Select(vehicle => vehicle.Id).Skip(1).FirstAsync(TestContext.Current.CancellationToken);
+        var repairTask = await _context.RepairTasks.OrderBy(task => task.Id)
+            .FirstAsync(TestContext.Current.CancellationToken);
+        var startAt = DateTimeOffset.UtcNow.Date.AddDays(3).AddHours(10);
+        var mainOrder = WorkOrderTestDataBuilder.Create()
+            .WithBranch(MechanicShop.Tests.Common.Branches.TestBranchIds.Main)
+            .WithVehicle(mainVehicleId)
+            .WithLabor(TestUsers.Labor01.Id)
+            .WithTimeSlot(startAt, startAt.AddHours(1))
+            .WithRepairTasks(repairTask)
+            .Build();
+        var northOrder = WorkOrderTestDataBuilder.Create()
+            .WithBranch(MechanicShop.Tests.Common.Branches.TestBranchIds.North)
+            .WithVehicle(northVehicleId)
+            .WithTimeSlot(startAt, startAt.AddHours(1))
+            .WithRepairTasks(repairTask)
+            .Build();
+        var unassignedOrder = WorkOrderTestDataBuilder.Create()
+            .WithBranch(MechanicShop.Tests.Common.Branches.TestBranchIds.Main)
+            .WithVehicle(northVehicleId)
+            .WithLabor(TestUsers.Labor02.Id)
+            .WithTimeSlot(startAt.AddHours(2), startAt.AddHours(3))
+            .WithRepairTasks(repairTask)
+            .Build();
+
+        _context.WorkOrders.AddRange(mainOrder, northOrder, unassignedOrder);
+        await _context.SaveChangesAsync(TestContext.Current.CancellationToken);
+
+        try
+        {
+            var managerToken = await _client.GenerateTokenAsync(TestUsers.Manager, TestContext.Current.CancellationToken);
+            _client.SetAuthorizationHeader(managerToken);
+            var managerResponse = await _client.GetAsync(
+                "/api/v1.0/workorders?page=1&pageSize=100",
+                TestContext.Current.CancellationToken);
+            Assert.Equal(HttpStatusCode.OK, managerResponse.StatusCode);
+            var managerResults = await managerResponse.Content.ReadFromJsonAsync<PaginatedList<WorkOrderListItemDto>>(
+                TestContext.Current.CancellationToken);
+            Assert.Contains(managerResults!.Items!, item => item.WorkOrderId == mainOrder.Id);
+            Assert.Contains(managerResults.Items!, item => item.WorkOrderId == northOrder.Id);
+            Assert.Contains(managerResults.Items!, item => item.WorkOrderId == unassignedOrder.Id);
+
+            var employeeToken = await _client.GenerateTokenAsync(
+                TestUsers.Labor01,
+                TestContext.Current.CancellationToken);
+            _client.SetAuthorizationHeader(employeeToken);
+            var employeeResponse = await _client.GetAsync(
+                "/api/v1.0/workorders?page=1&pageSize=100",
+                TestContext.Current.CancellationToken);
+            Assert.Equal(HttpStatusCode.OK, employeeResponse.StatusCode);
+            var employeeResults = await employeeResponse.Content.ReadFromJsonAsync<PaginatedList<WorkOrderListItemDto>>(
+                TestContext.Current.CancellationToken);
+            Assert.Contains(employeeResults!.Items!, item => item.WorkOrderId == mainOrder.Id);
+            Assert.DoesNotContain(employeeResults.Items!, item => item.WorkOrderId == northOrder.Id);
+            Assert.Contains(employeeResults.Items!, item => item.WorkOrderId == unassignedOrder.Id);
+        }
+        finally
+        {
+            await _context.WorkOrders.IgnoreQueryFilters()
+                .Where(order => order.Id == mainOrder.Id
+                    || order.Id == northOrder.Id
+                    || order.Id == unassignedOrder.Id)
+                .ExecuteDeleteAsync(TestContext.Current.CancellationToken);
+        }
+    }
+
+    [Fact]
     public async Task GetWorkOrders_WithoutAuthentication_ShouldReturnUnauthorized()
     {
         var response = await _client.GetAsync(
@@ -237,6 +309,7 @@ public class WorkOrdersControllerTests : IDisposable
         var request = new CreateWorkOrderRequest
         {
             Spot = Contracts.Common.Spot.B,
+            BranchId = MechanicShop.Tests.Common.Branches.TestBranchIds.Main,
             VehicleId = vehicle.Id,
             StartAtUtc = DateTimeOffset.UtcNow.Date.AddDays(1).AddHours(12),
             LaborId = laborId,
@@ -330,6 +403,7 @@ public class WorkOrdersControllerTests : IDisposable
             var request = new CreateWorkOrderRequest
             {
                 Spot = Contracts.Common.Spot.B,
+                BranchId = MechanicShop.Tests.Common.Branches.TestBranchIds.Main,
                 VehicleId = vehicleId,
                 StartAtUtc = startAt.AddMinutes(15),
                 LaborId = Guid.Parse(TestUsers.Labor02.Id),
@@ -401,6 +475,7 @@ public class WorkOrdersControllerTests : IDisposable
         {
             NewStartAtUtc = DateTime.UtcNow.AddHours(2),
             NewSpot = Contracts.Common.Spot.B,
+            RowVersion = workOrder.RowVersion,
         };
 
         try
@@ -438,6 +513,7 @@ public class WorkOrdersControllerTests : IDisposable
         {
             NewStartAtUtc = DateTime.UtcNow.AddHours(2),
             NewSpot = Contracts.Common.Spot.B,
+            RowVersion = new byte[8],
         };
 
         var response = await _client.PutAsJsonAsync(
@@ -470,7 +546,7 @@ public class WorkOrdersControllerTests : IDisposable
 
         await _context.SaveChangesAsync(TestContext.Current.CancellationToken);
 
-        var request = new AssignLaborRequest { LaborId = TestUsers.Labor02.Id };
+        var request = new AssignLaborRequest { LaborId = TestUsers.Labor02.Id, RowVersion = workOrder.RowVersion };
 
         try
         {
@@ -500,7 +576,7 @@ public class WorkOrdersControllerTests : IDisposable
 
         _client.SetAuthorizationHeader(token);
 
-        var request = new AssignLaborRequest { LaborId = Guid.Empty.ToString() };
+        var request = new AssignLaborRequest { LaborId = Guid.Empty.ToString(), RowVersion = new byte[8] };
 
         var response = await _client.PutAsJsonAsync(
             $"/api/v1.0/workorders/{Guid.NewGuid()}/labor",
@@ -540,6 +616,7 @@ public class WorkOrdersControllerTests : IDisposable
             var request = new UpdateWorkOrderStateRequest
             {
                 State = Contracts.Common.WorkOrderState.InProgress,
+                RowVersion = workOrder.RowVersion,
             };
 
             var response = await _client.PutAsJsonAsync(
@@ -556,6 +633,58 @@ public class WorkOrdersControllerTests : IDisposable
         {
             await _context
                 .WorkOrders.Where(w => w.Id == workOrder.Id)
+                .ExecuteDeleteAsync(TestContext.Current.CancellationToken);
+        }
+    }
+
+    [Fact]
+    public async Task UpdateWorkOrderState_WithStaleRowVersion_ShouldReturnConflictAndKeepFirstUpdate()
+    {
+        var token = await _client.GenerateTokenAsync(TestUsers.Manager, TestContext.Current.CancellationToken);
+        _client.SetAuthorizationHeader(token);
+
+        var workOrder = WorkOrderTestDataBuilder.Create()
+            .WithTimeSlot(DateTimeOffset.UtcNow.AddMinutes(-5), DateTimeOffset.UtcNow.AddMinutes(30))
+            .WithRepairTasks(await _context.RepairTasks.OrderBy(task => task.Id).Take(1)
+                .ToListAsync(TestContext.Current.CancellationToken))
+            .WithVehicle(await _context.Vehicles.OrderBy(vehicle => vehicle.Id)
+                .Select(vehicle => vehicle.Id).FirstAsync(TestContext.Current.CancellationToken))
+            .Build();
+        _context.WorkOrders.Add(workOrder);
+        await _context.SaveChangesAsync(TestContext.Current.CancellationToken);
+        var staleRowVersion = workOrder.RowVersion.ToArray();
+
+        try
+        {
+            var firstUpdate = await _client.PutAsJsonAsync(
+                $"/api/v1.0/workorders/{workOrder.Id}/state",
+                new UpdateWorkOrderStateRequest
+                {
+                    State = Contracts.Common.WorkOrderState.InProgress,
+                    RowVersion = staleRowVersion
+                },
+                TestContext.Current.CancellationToken);
+            Assert.Equal(HttpStatusCode.NoContent, firstUpdate.StatusCode);
+
+            var staleUpdate = await _client.PutAsJsonAsync(
+                $"/api/v1.0/workorders/{workOrder.Id}/state",
+                new UpdateWorkOrderStateRequest
+                {
+                    State = Contracts.Common.WorkOrderState.Completed,
+                    RowVersion = staleRowVersion
+                },
+                TestContext.Current.CancellationToken);
+
+            Assert.Equal(HttpStatusCode.Conflict, staleUpdate.StatusCode);
+            var persisted = await _context.WorkOrders.AsNoTracking()
+                .SingleAsync(item => item.Id == workOrder.Id, TestContext.Current.CancellationToken);
+            Assert.Equal(WorkOrderState.InProgress, persisted.State);
+            Assert.NotEqual(staleRowVersion, persisted.RowVersion);
+        }
+        finally
+        {
+            await _context.WorkOrders.IgnoreQueryFilters()
+                .Where(item => item.Id == workOrder.Id)
                 .ExecuteDeleteAsync(TestContext.Current.CancellationToken);
         }
     }
@@ -590,6 +719,7 @@ public class WorkOrdersControllerTests : IDisposable
             var request = new UpdateWorkOrderStateRequest
             {
                 State = Contracts.Common.WorkOrderState.InProgress,
+                RowVersion = workOrder.RowVersion,
             };
 
             var response = await _client.PutAsJsonAsync(
@@ -634,6 +764,7 @@ public class WorkOrdersControllerTests : IDisposable
             var request = new UpdateWorkOrderStateRequest
             {
                 State = Contracts.Common.WorkOrderState.InProgress,
+                RowVersion = workOrder.RowVersion,
             };
 
             var response = await _client.PutAsJsonAsync(
@@ -680,7 +811,7 @@ public class WorkOrdersControllerTests : IDisposable
             .Where(rt => !assignedRepairTaskIds.Contains(rt.Id))
             .FirstAsync(TestContext.Current.CancellationToken);
 
-        var request = new ModifyRepairTaskRequest { RepairTaskIds = [newRepairTask.Id] };
+        var request = new ModifyRepairTaskRequest { RepairTaskIds = [newRepairTask.Id], RowVersion = workOrder.RowVersion };
 
         try
         {
@@ -747,8 +878,9 @@ public class WorkOrdersControllerTests : IDisposable
 
         try
         {
-            var response = await _client.DeleteAsync(
+            var response = await _client.DeleteWithIfMatchAsync(
                 $"/api/v1.0/workorders/{workOrder.Id}",
+                workOrder.RowVersion,
                 TestContext.Current.CancellationToken);
 
             Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
@@ -773,8 +905,9 @@ public class WorkOrdersControllerTests : IDisposable
 
         var nonExistentId = Guid.NewGuid();
 
-        var response = await _client.DeleteAsync(
+        var response = await _client.DeleteWithIfMatchAsync(
             $"/api/v1.0/workorders/{nonExistentId}",
+            new byte[8],
             TestContext.Current.CancellationToken);
 
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
@@ -924,7 +1057,7 @@ public class WorkOrdersControllerTests : IDisposable
 
         _client.SetAuthorizationHeader(token);
 
-        var request = new AssignLaborRequest { LaborId = TestUsers.Labor01.Id };
+        var request = new AssignLaborRequest { LaborId = TestUsers.Labor01.Id, RowVersion = new byte[8] };
 
         var nonExistentId = Guid.NewGuid();
 
@@ -959,6 +1092,7 @@ public class WorkOrdersControllerTests : IDisposable
         var request = new UpdateWorkOrderStateRequest
         {
             State = Contracts.Common.WorkOrderState.InProgress,
+            RowVersion = new byte[8],
         };
 
         var response = await _client.PutAsJsonAsync(
@@ -991,7 +1125,7 @@ public class WorkOrdersControllerTests : IDisposable
         var token = await _client.GenerateTokenAsync(TestUsers.Manager, TestContext.Current.CancellationToken);
         _client.SetAuthorizationHeader(token);
 
-        var request = new ModifyRepairTaskRequest { RepairTaskIds = [Guid.NewGuid()] };
+        var request = new ModifyRepairTaskRequest { RepairTaskIds = [Guid.NewGuid()], RowVersion = new byte[8] };
 
         var response = await _client.PutAsJsonAsync(
             $"/api/v1.0/workorders/{Guid.NewGuid()}/repair-task",

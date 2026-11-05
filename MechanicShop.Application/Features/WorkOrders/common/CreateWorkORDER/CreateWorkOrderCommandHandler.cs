@@ -17,7 +17,8 @@ public class CreateWorkOrderCommandHandler(
     ILogger<CreateWorkOrderCommandHandler> logger,
     IAppDbContext context,
     HybridCache cache,
-    IWorkOrderPolicy workOrderValidator
+    IWorkOrderPolicy workOrderValidator,
+    ICurrentBranchContext currentBranchContext
     )
     : IRequestHandler<CreateWorkOrderCommand, Result<WorkOrderDto>>
 {
@@ -25,9 +26,33 @@ public class CreateWorkOrderCommandHandler(
     private readonly IAppDbContext _context = context;
     private readonly HybridCache _cache = cache;
     private readonly IWorkOrderPolicy _workOrderPolicy = workOrderValidator;
+    private readonly ICurrentBranchContext _currentBranchContext = currentBranchContext;
 
     public async Task<Result<WorkOrderDto>> Handle(CreateWorkOrderCommand command, CancellationToken cancellationToken)
     {
+        var branchId = _currentBranchContext.IsCompanyWide
+            ? command.BranchId
+            : _currentBranchContext.BranchId;
+        if (!branchId.HasValue)
+        {
+            return Error.Validation("Branch.Id.Required", "An active branch must be selected to create a work order.");
+        }
+
+        if (!_currentBranchContext.IsCompanyWide
+            && command.BranchId.HasValue
+            && command.BranchId.Value != branchId.Value)
+        {
+            return Error.Forbidden("Branch.Access.Denied", "A branch-scoped user cannot create a work order in another branch.");
+        }
+
+        var branchIsActive = await _context.Branches.AnyAsync(
+            branch => branch.Id == branchId.Value && branch.IsActive,
+            cancellationToken);
+        if (!branchIsActive)
+        {
+            return Error.NotFound("Branch.NotFound", "The selected branch does not exist or is inactive.");
+        }
+
         var repairTasks =await _context.RepairTasks
             .Where(x => command.RepairTaskIds.Contains(x.Id))
            .ToListAsync(cancellationToken);
@@ -86,6 +111,13 @@ public class CreateWorkOrderCommandHandler(
             return ApplicationErrors.LaborNotFound;
         }
 
+        if (command.LaborId.HasValue && !await _context.EmployeeBranchMemberships.AnyAsync(
+                membership => membership.EmployeeId == command.LaborId.Value && membership.BranchId == branchId.Value,
+                cancellationToken))
+        {
+            return Error.Conflict("Labor.Branch.Mismatch", "The labor employee is not a member of the selected branch.");
+        }
+
         var hasVehicleConflict = await _context.WorkOrders
            .AnyAsync(
                a =>
@@ -120,6 +152,7 @@ public class CreateWorkOrderCommandHandler(
         }
         var createWorkOrderResult = WorkOrder.Create(
            Guid.NewGuid(),
+           branchId.Value,
            command.VehicleId,
            command.StartAt,
            endAt,

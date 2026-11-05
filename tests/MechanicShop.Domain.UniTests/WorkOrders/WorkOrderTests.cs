@@ -1,4 +1,4 @@
-﻿using MechanicShop.Domain.Workorders;
+using MechanicShop.Domain.Workorders;
 using MechanicShop.Domain.Workorders.Enums;
 using MechanicShop.Tests.Common.RepaireTasks;
 
@@ -13,6 +13,7 @@ public class WorkOrderTests
     {
         var wo = WorkOrder.Create(
                     id: Guid.Empty,
+                    branchId: MechanicShop.Tests.Common.Branches.TestBranchIds.Main,
                     vehicleId: Guid.NewGuid(),
                     startAt: DateTimeOffset.UtcNow,
                     endAt: DateTimeOffset.UtcNow.AddHours(1),
@@ -30,6 +31,7 @@ public class WorkOrderTests
     {
         var wo = WorkOrder.Create(
                            id: Guid.NewGuid(),
+                           branchId: MechanicShop.Tests.Common.Branches.TestBranchIds.Main,
                            vehicleId: Guid.Empty,
                            startAt: DateTimeOffset.UtcNow,
                            endAt: DateTimeOffset.UtcNow.AddHours(1),
@@ -47,6 +49,7 @@ public class WorkOrderTests
     {
         var wo = WorkOrder.Create(
                            id: Guid.NewGuid(),
+                           branchId: MechanicShop.Tests.Common.Branches.TestBranchIds.Main,
                            vehicleId: Guid.NewGuid(),
                            startAt: DateTimeOffset.UtcNow,
                            endAt: DateTimeOffset.UtcNow.AddHours(1),
@@ -64,6 +67,7 @@ public class WorkOrderTests
     {
         var wo = WorkOrder.Create(
                               id: Guid.NewGuid(),
+                              branchId: MechanicShop.Tests.Common.Branches.TestBranchIds.Main,
                               vehicleId: Guid.NewGuid(),
                               startAt: DateTimeOffset.UtcNow,
                               endAt: DateTimeOffset.UtcNow.AddHours(1),
@@ -81,6 +85,7 @@ public class WorkOrderTests
     {
         var wo = WorkOrder.Create(
                            id: Guid.NewGuid(),
+                           branchId: MechanicShop.Tests.Common.Branches.TestBranchIds.Main,
                            vehicleId: Guid.NewGuid(),
                            startAt: DateTimeOffset.UtcNow.AddHours(1),
                            endAt: DateTimeOffset.UtcNow,
@@ -100,6 +105,7 @@ public class WorkOrderTests
 
         var wo = WorkOrder.Create(
                       id: Guid.NewGuid(),
+                      branchId: MechanicShop.Tests.Common.Branches.TestBranchIds.Main,
                       vehicleId: Guid.NewGuid(),
                       startAt: DateTimeOffset.UtcNow,
                       endAt: DateTimeOffset.UtcNow.AddHours(1),
@@ -117,6 +123,7 @@ public class WorkOrderTests
     {
         var wo = WorkOrder.Create(
                    id: Guid.NewGuid(),
+                   branchId: MechanicShop.Tests.Common.Branches.TestBranchIds.Main,
                    vehicleId: Guid.NewGuid(),
                    startAt: DateTimeOffset.UtcNow,
                    endAt: DateTimeOffset.UtcNow.AddHours(1),
@@ -138,6 +145,7 @@ public class WorkOrderTests
     {
         var wo = WorkOrder.Create(
                        id: Guid.NewGuid(),
+                       branchId: MechanicShop.Tests.Common.Branches.TestBranchIds.Main,
                        vehicleId: Guid.NewGuid(),
                        startAt: DateTimeOffset.UtcNow,
                        endAt: DateTimeOffset.UtcNow.AddHours(1),
@@ -156,6 +164,7 @@ public class WorkOrderTests
     {
         var wo = WorkOrder.Create(
                id: Guid.NewGuid(),
+               branchId: MechanicShop.Tests.Common.Branches.TestBranchIds.Main,
                vehicleId: Guid.NewGuid(),
                startAt: DateTimeOffset.UtcNow,
                endAt: DateTimeOffset.UtcNow.AddHours(1),
@@ -175,6 +184,7 @@ public class WorkOrderTests
     {
         var wo = WorkOrder.Create(
                           id: Guid.NewGuid(),
+                          branchId: MechanicShop.Tests.Common.Branches.TestBranchIds.Main,
                           vehicleId: Guid.NewGuid(),
                           startAt: DateTimeOffset.UtcNow,
                           endAt: DateTimeOffset.UtcNow.AddHours(1),
@@ -193,6 +203,7 @@ public class WorkOrderTests
     {
         var wo = WorkOrder.Create(
                       id: Guid.NewGuid(),
+                      branchId: MechanicShop.Tests.Common.Branches.TestBranchIds.Main,
                       vehicleId: Guid.NewGuid(),
                       startAt: DateTimeOffset.UtcNow,
                       endAt: DateTimeOffset.UtcNow.AddHours(1),
@@ -211,6 +222,7 @@ public class WorkOrderTests
     {
         var wo = WorkOrder.Create(
             id: Guid.NewGuid(),
+            branchId: MechanicShop.Tests.Common.Branches.TestBranchIds.Main,
             vehicleId: Guid.NewGuid(),
             startAt: DateTimeOffset.UtcNow,
             endAt: DateTimeOffset.UtcNow.AddHours(1),
@@ -230,6 +242,7 @@ public class WorkOrderTests
     {
         var wo = WorkOrder.Create(
             id: Guid.NewGuid(),
+            branchId: MechanicShop.Tests.Common.Branches.TestBranchIds.Main,
             vehicleId: Guid.NewGuid(),
             startAt: DateTimeOffset.UtcNow,
             endAt: DateTimeOffset.UtcNow.AddHours(1),
@@ -248,6 +261,7 @@ public class WorkOrderTests
     {
         var wo = WorkOrder.Create(
             id: Guid.NewGuid(),
+            branchId: MechanicShop.Tests.Common.Branches.TestBranchIds.Main,
             vehicleId: Guid.NewGuid(),
             startAt: DateTimeOffset.UtcNow,
             endAt: DateTimeOffset.UtcNow.AddHours(1),
@@ -269,6 +283,7 @@ public class WorkOrderTests
     {
         var wo = WorkOrder.Create(
             id: Guid.NewGuid(),
+            branchId: MechanicShop.Tests.Common.Branches.TestBranchIds.Main,
             vehicleId: Guid.NewGuid(),
             startAt: DateTimeOffset.UtcNow,
             endAt: DateTimeOffset.UtcNow.AddHours(1),

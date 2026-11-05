@@ -138,6 +138,71 @@ public class CachingBehaviorTests
             Times.Never);
     }
 
+    [Fact]
+    public async Task Handle_WhenBranchContextIsAvailable_ShouldPartitionCacheKeyByAccessScopeAndBranch()
+    {
+        var branchId = Guid.NewGuid();
+        var branchContext = new Mock<ICurrentBranchContext>();
+        branchContext.SetupGet(context => context.BranchId).Returns(branchId);
+        branchContext.SetupGet(context => context.IsCompanyWide).Returns(false);
+        var behavior = new CachingBehavior<CachedQuery, Result<string>>(
+            _loggerMock.Object,
+            _cacheMock.Object,
+            branchContext.Object);
+        string? actualKey = null;
+        _cacheMock
+            .Setup(cache => cache.SetAsync(
+                It.IsAny<string>(),
+                It.IsAny<Result<string>>(),
+                It.IsAny<HybridCacheEntryOptions>(),
+                It.IsAny<IEnumerable<string>>(),
+                It.IsAny<CancellationToken>()))
+            .Callback<string, Result<string>, HybridCacheEntryOptions, IEnumerable<string>, CancellationToken>(
+                (key, _, _, _, _) => actualKey = key)
+            .Returns(ValueTask.CompletedTask);
+
+        await behavior.Handle(
+            new CachedQuery(),
+            _ => Task.FromResult((Result<string>)"branch-data"),
+            CancellationToken.None);
+
+        Assert.Equal($"branch:{branchId:N}:management:test-key", actualKey);
+    }
+
+    [Fact]
+    public async Task Handle_WhenLaborContextIsAvailable_ShouldPartitionCacheKeyByEmployee()
+    {
+        var branchId = Guid.NewGuid();
+        var employeeId = Guid.NewGuid();
+        var branchContext = new Mock<ICurrentBranchContext>();
+        branchContext.SetupGet(context => context.BranchId).Returns(branchId);
+        branchContext.SetupGet(context => context.EmployeeId).Returns(employeeId);
+        branchContext.SetupGet(context => context.IsCompanyWide).Returns(false);
+        branchContext.SetupGet(context => context.IsLabor).Returns(true);
+        var behavior = new CachingBehavior<CachedQuery, Result<string>>(
+            _loggerMock.Object,
+            _cacheMock.Object,
+            branchContext.Object);
+        string? actualKey = null;
+        _cacheMock
+            .Setup(cache => cache.SetAsync(
+                It.IsAny<string>(),
+                It.IsAny<Result<string>>(),
+                It.IsAny<HybridCacheEntryOptions>(),
+                It.IsAny<IEnumerable<string>>(),
+                It.IsAny<CancellationToken>()))
+            .Callback<string, Result<string>, HybridCacheEntryOptions, IEnumerable<string>, CancellationToken>(
+                (key, _, _, _, _) => actualKey = key)
+            .Returns(ValueTask.CompletedTask);
+
+        await behavior.Handle(
+            new CachedQuery(),
+            _ => Task.FromResult((Result<string>)"labor-data"),
+            CancellationToken.None);
+
+        Assert.Equal($"branch:{branchId:N}:labor:{employeeId:N}:test-key", actualKey);
+    }
+
     // Request without caching
     public class NonCachedQuery;
 

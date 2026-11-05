@@ -17,6 +17,7 @@ public class WorkOrderTestDataBuilder : ITestDataBuilder<WorkOrder>
     private DateTimeOffset _startAt = DateTimeOffset.UtcNow;
     private DateTimeOffset _endAt = DateTimeOffset.UtcNow.AddHours(2);
     private Guid _laborId = Guid.Parse(TestUsers.Labor01.Id);
+    private Guid _branchId = MechanicShop.Tests.Common.Branches.TestBranchIds.Main;
     private Spot _spot = Spot.A;
     private List<RepairTask> _repairTasks = [];
     private WorkOrderState _state = WorkOrderState.Scheduled;
@@ -51,6 +52,12 @@ public class WorkOrderTestDataBuilder : ITestDataBuilder<WorkOrder>
     public WorkOrderTestDataBuilder WithLabor(Guid laborId)
     {
         _laborId = laborId;
+        return this;
+    }
+
+    public WorkOrderTestDataBuilder WithBranch(Guid branchId)
+    {
+        _branchId = branchId;
         return this;
     }
 
@@ -110,6 +117,7 @@ public class WorkOrderTestDataBuilder : ITestDataBuilder<WorkOrder>
     {
         var workOrder = WorkOrder.Create(
             id: _id,
+            branchId: _branchId,
             vehicleId: _vehicleId,
             startAt: _startAt,
             endAt: _endAt,

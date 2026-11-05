@@ -10,7 +10,9 @@ namespace MechanicShop.Domain.Workorders;
 
 public sealed class WorkOrder : AuditableEntity
 {
+    public Guid BranchId { get; private set; }
     public Guid VehicleId { get; }
+    public byte[] RowVersion { get; private set; } = [];
     public DateTimeOffset StartAtUtc { get; private set; }
     public DateTimeOffset EndAtUtc { get; private set; }
     public Guid? LaborId { get; private set; }
@@ -31,9 +33,10 @@ public sealed class WorkOrder : AuditableEntity
     private WorkOrder()
     { }
 
-    private WorkOrder(Guid id, Guid vehicleId, DateTimeOffset startAt, DateTimeOffset endAt, Guid? laborId, Spot spot, WorkOrderState state, List<RepairTask> repairTasks)
+    private WorkOrder(Guid id, Guid branchId, Guid vehicleId, DateTimeOffset startAt, DateTimeOffset endAt, Guid? laborId, Spot spot, WorkOrderState state, List<RepairTask> repairTasks)
         : base(id)
     {
+        BranchId = branchId;
         VehicleId = vehicleId;
         StartAtUtc = startAt;
         EndAtUtc = endAt;
@@ -43,7 +46,7 @@ public sealed class WorkOrder : AuditableEntity
         _repairTasks = repairTasks;
     }
 
-    public static Result<WorkOrder> Create(Guid id, Guid vehicleId, DateTimeOffset startAt, DateTimeOffset endAt, Guid? laborId, Spot spot, List<RepairTask> repairTasks)
+    public static Result<WorkOrder> Create(Guid id, Guid branchId, Guid vehicleId, DateTimeOffset startAt, DateTimeOffset endAt, Guid? laborId, Spot spot, List<RepairTask> repairTasks)
     {
         if (id == Guid.Empty)
         {
@@ -53,6 +56,11 @@ public sealed class WorkOrder : AuditableEntity
         if (vehicleId == Guid.Empty)
         {
             return WorkOrderErrors.VehicleIdRequired;
+        }
+
+        if (branchId == Guid.Empty)
+        {
+            return WorkOrderErrors.BranchIdRequired;
         }
 
         if (repairTasks == null || repairTasks.Count == 0)
@@ -75,7 +83,7 @@ public sealed class WorkOrder : AuditableEntity
             return WorkOrderErrors.SpotInvalid;
         }
 
-        return new WorkOrder(id, vehicleId, startAt, endAt, laborId, spot, WorkOrderState.Scheduled, repairTasks);
+        return new WorkOrder(id, branchId, vehicleId, startAt, endAt, laborId, spot, WorkOrderState.Scheduled, repairTasks);
     }
 
     public Result<Updated> AddRepairTask(RepairTask repairTask)

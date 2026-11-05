@@ -25,7 +25,7 @@ public class DeleteWorkOrderCommandHandlerTests(WebAppFactory factory)
     public async Task Handle_WhenWorkOrderDoesNotExist_ShouldReturnError()
     {
         var result = await _mediator.Send(
-            new DeleteWorkOrderCommand(Guid.NewGuid()),
+            new DeleteWorkOrderCommand(Guid.NewGuid(), new byte[8]),
             TestContext.Current.CancellationToken);
 
         Assert.True(result.IsError);
@@ -36,9 +36,12 @@ public class DeleteWorkOrderCommandHandlerTests(WebAppFactory factory)
     {
         var workOrder = await CreateWorkOrderAsync();
         factory.WorkOrderNotifier.Clear();
+        factory.WorkOrderNotifier.OnNotify = async _ => Assert.False(await _context.WorkOrders.AnyAsync(
+            order => order.Id == workOrder.Id,
+            TestContext.Current.CancellationToken));
 
         var result = await _mediator.Send(
-            new DeleteWorkOrderCommand(workOrder.Id),
+            new DeleteWorkOrderCommand(workOrder.Id, workOrder.RowVersion),
             TestContext.Current.CancellationToken);
 
         Assert.False(result.IsError);
@@ -56,7 +59,7 @@ public class DeleteWorkOrderCommandHandlerTests(WebAppFactory factory)
         await _context.SaveChangesAsync(TestContext.Current.CancellationToken);
 
         var result = await _mediator.Send(
-            new DeleteWorkOrderCommand(workOrder.Id),
+            new DeleteWorkOrderCommand(workOrder.Id, workOrder.RowVersion),
             TestContext.Current.CancellationToken);
 
         Assert.True(result.IsError);
@@ -79,7 +82,7 @@ public class DeleteWorkOrderCommandHandlerTests(WebAppFactory factory)
         await _context.SaveChangesAsync(TestContext.Current.CancellationToken);
 
         var result = await _mediator.Send(
-            new DeleteWorkOrderCommand(workOrder.Id),
+            new DeleteWorkOrderCommand(workOrder.Id, workOrder.RowVersion),
             TestContext.Current.CancellationToken);
 
         var persisted = await _context.WorkOrders.AsNoTracking().SingleAsync(

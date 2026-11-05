@@ -15,4 +15,7 @@ public static class EmployeeErrors
 
     public static Error RoleInvalid =>
         Error.Validation("Employee.Role.Invalid", "Invalid role assigned to employee.");
+
+    public static Error AccessScopeInvalid =>
+        Error.Validation("Employee.AccessScope.Invalid", "The access scope is invalid for the selected role.");
 }

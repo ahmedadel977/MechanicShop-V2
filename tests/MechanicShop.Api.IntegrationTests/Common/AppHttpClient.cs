@@ -20,9 +20,7 @@ public class AppHttpClient : IDisposable
         _tokenProvider = tokenProvider;
     }
 
-    public Task<string> GenerateTokenAsync(
-        AppUser user,
-        CancellationToken cancellationToken = default)
+    public Task<string> GenerateTokenAsync(AppUser user, CancellationToken cancellationToken = default)
     {
         if (_tokenProvider is not null)
         {
@@ -91,6 +89,16 @@ public class AppHttpClient : IDisposable
     public async Task<HttpResponseMessage> DeleteAsync(string requestUri, CancellationToken cancellationToken = default)
     {
         return await _httpClient.DeleteAsync(requestUri, cancellationToken);
+    }
+
+    public Task<HttpResponseMessage> DeleteWithIfMatchAsync(
+        string requestUri,
+        byte[] rowVersion,
+        CancellationToken cancellationToken = default)
+    {
+        var request = new HttpRequestMessage(HttpMethod.Delete, requestUri);
+        request.Headers.TryAddWithoutValidation("If-Match", Convert.ToBase64String(rowVersion));
+        return _httpClient.SendAsync(request, cancellationToken);
     }
 
     public async Task<HttpResponseMessage> PatchAsJsonAsync<T>(string requestUri, T value, CancellationToken cancellationToken = default)

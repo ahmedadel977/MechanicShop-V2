@@ -13,6 +13,14 @@ public static class WorkOrderErrors
         code: "WorkOrderErrors.VehicleIdRequired",
         description: "Vehicle Id is required");
 
+    public static Error BranchIdRequired => Error.Validation(
+        code: "WorkOrderErrors.BranchIdRequired",
+        description: "Branch Id is required");
+
+    public static Error ConcurrencyConflict => Error.Conflict(
+        code: "WorkOrderErrors.ConcurrencyConflict",
+        description: "تم تعديل أمر الشغل بواسطة مستخدم آخر. حدّث البيانات وحاول مرة تانية.");
+
     public static Error RepairTasksRequired => Error.Validation(
         code: "WorkOrderErrors.RepairTasksRequired",
         description: "At least one repair task is required");

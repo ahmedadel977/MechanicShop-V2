@@ -52,7 +52,7 @@ public class GetWorkOrdersQueryHandlerTests(WebAppFactory factory)
         var repairTask = RepairTaskFactory.CreateRepairTask(name: taskName).Value;
         var start = DateTimeOffset.UtcNow.Date.AddDays(3_000).AddHours(10);
         var order = WorkOrder.Create(
-            Guid.NewGuid(), vehicle.Id, start, start.AddHours(1), labor.Id, Spot.A, [repairTask]).Value;
+            Guid.NewGuid(), MechanicShop.Tests.Common.Branches.TestBranchIds.Main, vehicle.Id, start, start.AddHours(1), labor.Id, Spot.A, [repairTask]).Value;
         order.Vehicle = vehicle;
         order.Labor = labor;
         await _context.Customers.AddAsync(customer, TestContext.Current.CancellationToken);

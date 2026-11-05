@@ -6,4 +6,5 @@ public class RelocateWorkOrderRequest
 {
     public DateTimeOffset NewStartAtUtc { get; set; }
     public Spot NewSpot { get; set; }
+    public byte[]? RowVersion { get; set; }
 }

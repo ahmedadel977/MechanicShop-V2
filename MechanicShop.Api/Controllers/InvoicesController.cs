@@ -17,6 +17,7 @@ namespace MechanicShop.Api.Controllers;
 [Route("api/v{version:apiVersion}/invoices")]
 [ApiVersion("1.0")]
 [Authorize(Policy = "ManagerOnly")]
+[Authorize(Policy = "ActiveBranchAccess")]
 public sealed class InvoicesController(ISender sender) : ApiController
 {
     [HttpPost("workorders/{workOrderId:guid}")]
