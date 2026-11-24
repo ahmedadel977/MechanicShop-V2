@@ -58,9 +58,9 @@ With the example port settings, the API is at `http://localhost:5106`, Seq at `h
 | MechanicShop.Contracts | Request and response models shared by the API and client. |
 | MechanicShop.Client | Blazor WebAssembly user interface. |
 | tests/MechanicShop.Api.IntegrationTests | HTTP and SignalR integration tests using WebApplicationFactory and Testcontainers. |
-| tests/MechanicShop.Application.SubcutaneiousTests | Application tests using an integration-style setup. |
-| tests/MechanicShop.Application.UniTests | Application unit tests. |
-| tests/MechanicShop.Domain.UniTests | Domain unit tests. |
+| tests/MechanicShop.Application.SubcutaneousTests | Application tests using an integration-style setup. |
+| tests/MechanicShop.Application.UnitTests | Application unit tests. |
+| tests/MechanicShop.Domain.UnitTests | Domain unit tests. |
 | tests/MechanicShop.Tests.Common | Shared test data and helpers. |
 
 ## Domain Model and Database
@@ -180,10 +180,10 @@ Replace the placeholders with values for your local environment. Do not commit p
 
 From the repository root:
 
-`MechanicShop.slnx` contains the .NET application and test projects for command-line restore, build, and test. The Visual Studio Docker Compose project is available in `MechanicShop.sln`.
+`MechanicShop.slnx` is the authoritative solution and includes the Visual Studio Docker Compose project. NuGet restore uses its inclusion list so the non-NuGet `.dcproj` is skipped while all .NET projects in the solution are restored.
 
 ~~~powershell
-dotnet restore MechanicShop.slnx
+dotnet restore MechanicShop.slnx -p:RestoreProjectFilterMode=inclusionlist
 dotnet run --project src/MechanicShop.Api/MechanicShop.Api.csproj
 ~~~
 
@@ -203,7 +203,7 @@ Run the solution tests with:
 dotnet test MechanicShop.slnx
 ~~~
 
-In the latest local verification, the three targeted tests for password change, inactive-branch SignalR membership, and work order filtering passed: **3 passed, 0 failed, 0 skipped**. The complete solution test suite was not run in this review.
+The complete solution test suite runs across unit, subcutaneous, and API integration tests. It requires Docker for the container-backed tests.
 
 Coverlet.MTP is referenced by the test projects. A coverage report was not generated in this review, so no coverage percentage is reported here.
 

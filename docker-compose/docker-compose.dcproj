@@ -7,13 +7,18 @@
     <DependencyAwareStart>true</DependencyAwareStart>
   </PropertyGroup>
   <ItemGroup>
-    <None Include=".dockerignore" />
+    <None Include="..\.dockerignore" Link=".dockerignore" />
     <None Include=".env" />
     <None Include=".env.example" />
     <None Include="docker-compose.yml" />
     <None Include="docker-compose.override.yml">
       <DependentUpon>docker-compose.yml</DependentUpon>
     </None>
+    <None Include="otel-collector\otel-collector.yml" />
+    <None Include="prometheus\prometheus.yml" />
+    <None Include="grafana\provisioning\datasources\prometheus.yml" />
+    <None Include="grafana\provisioning\dashboards\dashboards.yml" />
+    <None Include="grafana\dashboards\mechanicshop-overview.json" />
     <None Include="Properties\launchSettings.json" />
   </ItemGroup>
 </Project>

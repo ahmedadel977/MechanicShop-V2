@@ -45,7 +45,7 @@ public class RelocateWorkOrderCommandHandler(
         var endAt = command.NewStartAt.Add(duration);
 
         var checkSpotAvailabilityResult = await _appointmentValidator.CheckSpotAvailabilityAsync(
-            workOrder.Spot,
+            command.NewSpot,
             command.NewStartAt,
             endAt,
             excludeWorkOrderId: workOrder.Id,

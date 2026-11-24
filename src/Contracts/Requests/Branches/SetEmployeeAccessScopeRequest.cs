@@ -1,4 +1,4 @@
-using MechanicShop.Domain.Identity;
+using MechanicShop.Contracts.Common;
 
 namespace MechanicShop.Contracts.Requests.Branches;
 

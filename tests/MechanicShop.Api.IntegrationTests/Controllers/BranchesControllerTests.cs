@@ -203,7 +203,7 @@ public sealed class BranchesControllerTests : IDisposable
             $"/api/v1.0/branches/employees/{TestUsers.Labor01.Id}/access-scope",
             new SetEmployeeAccessScopeRequest
             {
-                AccessScope = MechanicShop.Domain.Identity.AccessScope.Company
+                AccessScope = MechanicShop.Contracts.Common.AccessScope.Company
             },
             TestContext.Current.CancellationToken);
 
@@ -245,7 +245,7 @@ public sealed class BranchesControllerTests : IDisposable
 
         var missingScopeTargetResponse = await _client.PutAsJsonAsync(
             $"/api/v1.0/branches/employees/{Guid.NewGuid()}/access-scope",
-            new SetEmployeeAccessScopeRequest { AccessScope = AccessScope.Branch },
+            new SetEmployeeAccessScopeRequest { AccessScope = MechanicShop.Contracts.Common.AccessScope.Branch },
             TestContext.Current.CancellationToken);
         Assert.Equal(HttpStatusCode.NotFound, missingScopeTargetResponse.StatusCode);
     }
@@ -353,13 +353,13 @@ public sealed class BranchesControllerTests : IDisposable
 
             var targetScopeResponse = await _client.PutAsJsonAsync(
                 $"/api/v1.0/branches/employees/{targetManager.EmployeeId}/access-scope",
-                new SetEmployeeAccessScopeRequest { AccessScope = AccessScope.Company },
+                new SetEmployeeAccessScopeRequest { AccessScope = MechanicShop.Contracts.Common.AccessScope.Company },
                 TestContext.Current.CancellationToken);
             Assert.Equal(HttpStatusCode.Forbidden, targetScopeResponse.StatusCode);
 
             var selfScopeResponse = await _client.PutAsJsonAsync(
                 $"/api/v1.0/branches/employees/{manager.EmployeeId}/access-scope",
-                new SetEmployeeAccessScopeRequest { AccessScope = AccessScope.Company },
+                new SetEmployeeAccessScopeRequest { AccessScope = MechanicShop.Contracts.Common.AccessScope.Company },
                 TestContext.Current.CancellationToken);
             Assert.Equal(HttpStatusCode.Forbidden, selfScopeResponse.StatusCode);
 
@@ -385,7 +385,7 @@ public sealed class BranchesControllerTests : IDisposable
             await AuthenticateAsync(TestUsers.Manager);
             var response = await _client.PutAsJsonAsync(
                 $"/api/v1.0/branches/employees/{targetManager.EmployeeId}/access-scope",
-                new SetEmployeeAccessScopeRequest { AccessScope = AccessScope.Company },
+                new SetEmployeeAccessScopeRequest { AccessScope = MechanicShop.Contracts.Common.AccessScope.Company },
                 TestContext.Current.CancellationToken);
 
             Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);

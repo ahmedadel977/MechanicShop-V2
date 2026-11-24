@@ -29,3 +29,7 @@ Rate limits are configured under `RateLimiting`. Forwarded client addresses are 
 ## Reporting a vulnerability
 
 Report suspected vulnerabilities privately to the repository maintainers. Include the affected endpoint or package, impact, reproduction details, and a safe contact method. Do not include live credentials or customer data in the report.
+
+## Password policy
+
+ASP.NET Core Identity requires passwords to contain at least 12 characters. Digit, uppercase, lowercase, and non-alphanumeric composition requirements are disabled to avoid brittle composition rules; Identity's unique-character minimum remains one. Registration and password changes use the same Identity policy. Existing password hashes are not modified, and existing users can continue to sign in.

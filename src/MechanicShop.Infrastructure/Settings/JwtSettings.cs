@@ -14,5 +14,5 @@ public sealed class JwtSettings
         && Encoding.UTF8.GetByteCount(Secret) >= 32
         && !string.IsNullOrWhiteSpace(Issuer)
         && !string.IsNullOrWhiteSpace(Audience)
-        && TokenExpirationInMinutes > 0;
+        && TokenExpirationInMinutes is >= 1 and <= 1440;
 }

@@ -270,5 +270,5 @@ For a local deployment, follow the Quick Start and verify `/health`, API logs, d
 - `docker-compose/docker-compose.yml`: services, internal connectivity, required environment, health checks, and named volumes.
 - `docker-compose/docker-compose.override.yml`: local Development mode and host port publication.
 - `docker-compose/.env.example`: variable names and placeholder values for local setup.
-- `otel-collector/otel-collector.yml`, `prometheus/prometheus.yml`, and `grafana/`: monitoring configuration mounted by the stack.
+- `docker-compose/otel-collector/otel-collector.yml`, `docker-compose/prometheus/prometheus.yml`, and `docker-compose/grafana/`: monitoring configuration mounted by the stack.
 - `global.json`, `Directory.Build.props`, `Directory.Packages.props`, and `NuGet.Config`: SDK selection and shared .NET build/package configuration consumed by the Docker build.

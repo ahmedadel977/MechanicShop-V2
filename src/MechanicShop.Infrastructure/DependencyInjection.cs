@@ -62,12 +62,10 @@ public static class DependencyInjection
 
 
         var jwtSettingsSection = configuration.GetSection("JwtSettings");
-        var jwtSettings = jwtSettingsSection.Get<JwtSettings>() ?? new JwtSettings();
-
         services.AddOptions<JwtSettings>()
             .Bind(jwtSettingsSection)
             .Validate(settings => settings.IsValid,
-                "JwtSettings requires a secret of at least 32 UTF-8 bytes, an issuer, an audience, and a positive token lifetime.")
+                "JwtSettings requires a signing key of at least 32 UTF-8 bytes, a non-empty issuer and audience, and a token lifetime from 1 to 1440 minutes.")
             .ValidateOnStart();
 
             services.AddAuthentication(options =>
@@ -76,22 +74,6 @@ public static class DependencyInjection
                 options.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
             }).AddJwtBearer(options =>
             {
-                options.TokenValidationParameters = new TokenValidationParameters
-                {
-                    ValidateIssuer = true,
-                    ValidateAudience = true,
-                    ValidateLifetime = true,
-                    ClockSkew = TimeSpan.Zero,
-                    ValidateIssuerSigningKey = true,
-                    RequireSignedTokens = true,
-                    ValidAlgorithms = [SecurityAlgorithms.HmacSha256],
-                    ValidIssuer = jwtSettings.Issuer,
-                    ValidAudience = jwtSettings.Audience,
-                    IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtSettings.Secret)),
-                    NameClaimType = ClaimTypes.NameIdentifier,
-                    RoleClaimType = ClaimTypes.Role
-                };
-
                 options.Events = new JwtBearerEvents
                 {
                     OnMessageReceived = context =>
@@ -108,10 +90,31 @@ public static class DependencyInjection
                 };
             });
 
+            services.AddOptions<JwtBearerOptions>(JwtBearerDefaults.AuthenticationScheme)
+                .Configure<Microsoft.Extensions.Options.IOptions<JwtSettings>>((options, jwtOptions) =>
+                {
+                    var jwtSettings = jwtOptions.Value;
+                    options.TokenValidationParameters = new TokenValidationParameters
+                    {
+                        ValidateIssuer = true,
+                        ValidateAudience = true,
+                        ValidateLifetime = true,
+                        ClockSkew = TimeSpan.Zero,
+                        ValidateIssuerSigningKey = true,
+                        RequireSignedTokens = true,
+                        ValidAlgorithms = [SecurityAlgorithms.HmacSha256],
+                        ValidIssuer = jwtSettings.Issuer,
+                        ValidAudience = jwtSettings.Audience,
+                        IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtSettings.Secret)),
+                        NameClaimType = ClaimTypes.NameIdentifier,
+                        RoleClaimType = ClaimTypes.Role
+                    };
+                });
+
             services
             .AddIdentityCore<AppUser>(options =>
             {
-                options.Password.RequiredLength = 6;
+                options.Password.RequiredLength = 12;
                 options.Password.RequireDigit = false;
                 options.Password.RequireNonAlphanumeric = false;
                 options.Password.RequireUppercase = false;

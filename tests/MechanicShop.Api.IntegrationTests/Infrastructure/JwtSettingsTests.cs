@@ -43,4 +43,31 @@ public sealed class JwtSettingsTests
         settings.TokenExpirationInMinutes = 0;
         Assert.False(settings.IsValid);
     }
+
+    [Fact]
+    public void IsValid_RejectsMissingSigningKey()
+    {
+        var settings = new JwtSettings
+        {
+            Issuer = "MechanicShop",
+            Audience = "MechanicShop.Client",
+            TokenExpirationInMinutes = 60
+        };
+
+        Assert.False(settings.IsValid);
+    }
+
+    [Fact]
+    public void IsValid_RejectsTokenLifetimeOverOneDay()
+    {
+        var settings = new JwtSettings
+        {
+            Secret = new string('k', 32),
+            Issuer = "MechanicShop",
+            Audience = "MechanicShop.Client",
+            TokenExpirationInMinutes = 1441
+        };
+
+        Assert.False(settings.IsValid);
+    }
 }
