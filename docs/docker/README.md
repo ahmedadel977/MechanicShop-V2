@@ -65,20 +65,6 @@ docker compose down
 
 هذا يزيل الحاويات والشبكة ويُبقي البيانات في named volumes. لا تستخدم `docker compose down --volumes` إلا إذا كنت تقصد حذف بيانات SQL وRedis وSeq وPrometheus وGrafana نهائيًا.
 
-## الفصول والتمارين
-
-1. [مفاهيم Docker](01-docker-fundamentals.md)
-2. [شرح Dockerfile](02-dockerfile.md)
-3. [البناء متعدد المراحل](03-multistage-build.md)
-4. [شرح Compose وبيئات التشغيل](04-compose.md)
-5. [الشبكات وDNS داخل Docker](05-networking.md)
-6. [Volumes والبيانات الدائمة](06-volumes.md)
-7. [SQL Server وRedis وSeq](07-services.md)
-8. [السجلات والمقاييس والتتبّع](08-observability.md)
-9. [مرجع الأوامر](09-commands.md)
-10. [الأمان](10-security.md)
-11. [استكشاف الأخطاء](11-troubleshooting.md)
-12. [خطة التعلّم والتمارين](progress-tracker.md)
 
 ## حدود التحقق المحلي
 
