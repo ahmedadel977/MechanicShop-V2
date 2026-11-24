@@ -180,6 +180,8 @@ Replace the placeholders with values for your local environment. Do not commit p
 
 From the repository root:
 
+`MechanicShop.slnx` contains the .NET application and test projects for command-line restore, build, and test. The Visual Studio Docker Compose project is available in `MechanicShop.sln`.
+
 ~~~powershell
 dotnet restore MechanicShop.slnx
 dotnet run --project src/MechanicShop.Api/MechanicShop.Api.csproj

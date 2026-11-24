@@ -23,9 +23,4 @@
     <Project Path="tests/MechanicShop.Domain.UniTests/MechanicShop.Domain.UniTests.csproj" />
     <Project Path="tests/MechanicShop.Tests.Common/MechanicShop.Tests.Common.csproj" />
   </Folder>
-  <Folder Name="/docker-compose/">
-    <Project Path="docker-compose/docker-compose.dcproj">
-      <Build />
-    </Project>
-  </Folder>
 </Solution>
