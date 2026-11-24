@@ -34,28 +34,14 @@ flowchart LR
 
 ## Docker
 
-The API, SQL Server, Redis, Seq, OpenTelemetry Collector, Prometheus, and Grafana can be run with Docker Compose. Docker Desktop (Linux containers) or Docker Engine with the Compose v2 plugin is required. Install the .NET 10 SDK for host-based development.
-
-### Quick Start
-
-From the repository root, create a local environment file and replace every sample credential in it before starting containers:
+Docker is currently used by the integration tests through Testcontainers, which starts disposable SQL Server and Redis containers. The promoted branch does not contain a Dockerfile or Docker Compose deployment, so there is no Compose startup or stop command yet. Install Docker Desktop or Docker Engine and start the daemon before running the container-backed tests:
 
 ~~~powershell
-Copy-Item docker-compose/.env.example docker-compose/.env
-# Edit docker-compose/.env and set unique local secrets.
-docker compose --env-file docker-compose/.env -f docker-compose/docker-compose.yml -f docker-compose/docker-compose.override.yml config --quiet
-docker compose --env-file docker-compose/.env -f docker-compose/docker-compose.yml -f docker-compose/docker-compose.override.yml up --build -d
+docker version
+dotnet test tests/MechanicShop.Api.IntegrationTests/MechanicShop.Api.IntegrationTests.csproj
 ~~~
 
-With the supplied example port settings, the API is at `http://localhost:5106`, Seq at `http://localhost:5341`, Prometheus at `http://localhost:9090`, and Grafana at `http://localhost:3000`. The API health endpoint is `/health`. Ports can be changed in the local `.env` file.
-
-Stop containers and remove the Compose network while retaining named data volumes:
-
-~~~powershell
-docker compose --env-file docker-compose/.env -f docker-compose/docker-compose.yml -f docker-compose/docker-compose.override.yml down
-~~~
-
-The local `.env` file contains secrets and must not be committed. `docker compose down -v` also deletes persistent SQL Server, Redis, Seq, Prometheus, and Grafana data. See [Docker and Docker Compose documentation](docs/DOCKER.md) for architecture, configuration, migrations, operations, troubleshooting, and production recommendations.
+See [Docker and containerization documentation](docs/DOCKER.md) for the tracked Docker support, test container lifecycle, limitations, and production recommendations.
 
 ### Solution Projects
 
