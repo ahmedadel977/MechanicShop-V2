@@ -45,9 +45,9 @@ docker compose ps
 | `docker-compose/docker-compose.dcproj` | مشروع Visual Studio 2026 وملف إعداد Compose Environment. |
 | `docker-compose/.env.example` | أسماء الإعدادات المطلوبة وقيم منافذ افتراضية بلا أسرار. |
 | `.dockerignore` في جذر الحل | يستبعد الملفات الحساسة والمخرجات من سياق بناء API. الملف داخل `docker-compose/` تنظيمي فقط، لأن سياق البناء هو جذر الحل. |
-| `../otel-collector/otel-collector.yml` | استقبال traces/metrics وتمريرها إلى الوجهات. |
-| `../prometheus/prometheus.yml` | أهداف جمع المقاييس. |
-| `../grafana/provisioning/` | إعداد مصدر البيانات ولوحات Grafana تلقائيًا. |
+| `docker-compose/otel-collector/otel-collector.yml` | استقبال traces/metrics وتمريرها إلى الوجهات. |
+| `docker-compose/prometheus/prometheus.yml` | أهداف جمع المقاييس. |
+| `docker-compose/grafana/provisioning/` | إعداد مصدر البيانات ولوحات Grafana تلقائيًا. |
 
 ملف `docker-compose/.dockerignore` موجود ضمن مشروع Visual Studio حسب التنظيم المطلوب، لكنه لا يتحكم في build context. Docker يقرأ `D:\MechanicShop\.dockerignore` لأن السياق المحدد هو مجلد الحل (`..` من مجلد Compose).
 

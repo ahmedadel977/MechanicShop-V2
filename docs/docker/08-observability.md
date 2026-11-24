@@ -17,4 +17,4 @@ flowchart LR
 
 تم ضبط resource service name إلى `MechanicShop.Api` ليكون مميزًا عن الاسم الافتراضي السابق. لا ترسل أسرارًا أو بيانات شخصية حساسة في السجلات أو tags. راقب cardinality في أسماء المقاييس ولا تستخدم معرف العميل أو الطلب كـlabel غير محدود.
 
-لوحة Grafana الأولية تعرض scrape targets ومعدل الطلبات عندما تتوفر المقاييس ذات الصلة. إذا لم يظهر metric، تحقق أولًا من `docker compose ps` ثم سجلات `otel-collector` و`prometheus`، وبعدها من اسم الـinstrumentation والمصدر.
+لوحة Grafana تعرض scrape targets ومعدل الطلبات ومدة الطلبات عند p95 ومعدل أخطاء HTTP 5xx والطلبات النشطة، باستخدام مقاييس ASP.NET Core التي يجمعها التطبيق. لا يفعّل التطبيق حاليًا مقاييس Runtime أو قاعدة البيانات. إذا لم يظهر metric، تحقق أولًا من `docker compose ps` ثم سجلات `otel-collector` و`prometheus`، وبعدها من اسم الـinstrumentation والمصدر.

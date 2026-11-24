@@ -12,7 +12,7 @@ Compose يعرّف كل خدمة كحاوية مستقلة. `depends_on` ينت�
 
 ## إعدادات Compose
 
-`build.context: ..` يجعل جذر الحل متاحًا من مجلد Compose. `dockerfile` يشير إلى `src/MechanicShop.Api/Dockerfile` نسبةً إلى build context. `environment` يمرر إعدادات .NET عبر تحويل `__` إلى `:`. `expose` يوثق منافذ الخدمات داخل الشبكة؛ `ports` ينشرها على جهاز التطوير. مسارات bind mounts مثل `../prometheus/prometheus.yml` تُحل نسبةً إلى ملف Compose الأساسي. `healthcheck` يفحص SQL وRedis وPrometheus وصحة API.
+`build.context: ..` يجعل جذر الحل متاحًا من مجلد Compose. `dockerfile` يشير إلى `src/MechanicShop.Api/Dockerfile` نسبةً إلى build context. `environment` يمرر إعدادات .NET عبر تحويل `__` إلى `:`. `expose` يوثق منافذ الخدمات داخل الشبكة؛ `ports` ينشرها على جهاز التطوير. مسارات bind mounts مثل `./prometheus/prometheus.yml` تُحل نسبةً إلى ملف Compose الأساسي. `healthcheck` يفحص SQL وRedis وPrometheus وصحة API.
 
 يُستخدم ملف `.env` للاستبدال داخل YAML، ولا يعني وحده أن كل متغير سيصبح بيئة داخل الحاوية. `environment` هو الذي يمرر القيم للعملية. لا يوجد `env_file:` في هذا الإعداد حتى لا تُمرّر متغيرات المضيف كلها للتطبيق.
 

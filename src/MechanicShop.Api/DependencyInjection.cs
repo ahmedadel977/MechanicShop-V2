@@ -40,7 +40,7 @@ public static class DependencyInjection
                 .AddIdentityInfrastructure()
                 .AddAppRateLimiting(configuration)
                 .AddAppOutputCaching()
-                .AddAppOpenTelememrty()
+                .AddAppOpenTelemetry()
                 .AddSignalR();
 
         return services;
@@ -59,7 +59,7 @@ public static class DependencyInjection
         return services;
     }
 
-    public static IServiceCollection AddAppOpenTelememrty(this IServiceCollection services)
+    public static IServiceCollection AddAppOpenTelemetry(this IServiceCollection services)
     {
         services.AddOpenTelemetry()
         .ConfigureResource(res => res.AddService("MechanicShop.Api"))

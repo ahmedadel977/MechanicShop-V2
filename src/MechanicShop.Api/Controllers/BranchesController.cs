@@ -155,7 +155,7 @@ public sealed class BranchesController(ISender sender) : ApiController
         CancellationToken cancellationToken)
     {
         var result = await sender.Send(
-            new SetEmployeeAccessScopeCommand(employeeId, request.AccessScope),
+            new SetEmployeeAccessScopeCommand(employeeId, (MechanicShop.Domain.Identity.AccessScope)request.AccessScope),
             cancellationToken);
 
         return result.Match(_ => NoContent(), Problem);
