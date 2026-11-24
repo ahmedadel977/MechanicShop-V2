@@ -1,0 +1,19 @@
+<Project ToolsVersion="15.0" Sdk="Microsoft.Docker.Sdk">
+  <PropertyGroup Label="Globals">
+    <ProjectVersion>2.1</ProjectVersion>
+    <DockerTargetOS>Linux</DockerTargetOS>
+    <DockerComposeProjectName>mechanicshop</DockerComposeProjectName>
+    <DockerComposeEnvFilePath>.env</DockerComposeEnvFilePath>
+    <DependencyAwareStart>true</DependencyAwareStart>
+  </PropertyGroup>
+  <ItemGroup>
+    <None Include=".dockerignore" />
+    <None Include=".env" />
+    <None Include=".env.example" />
+    <None Include="docker-compose.yml" />
+    <None Include="docker-compose.override.yml">
+      <DependentUpon>docker-compose.yml</DependentUpon>
+    </None>
+    <None Include="Properties\launchSettings.json" />
+  </ItemGroup>
+</Project>

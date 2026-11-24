@@ -2,13 +2,13 @@
 
 ## Secret configuration
 
-`JwtSettings:Secret` must be supplied outside tracked configuration. It must contain at least 32 UTF-8 bytes. In Development, ASP.NET Core User Secrets are loaded through the `UserSecretsId` in `MechanicShop.Api.csproj`. In hosted environments, supply it as the `JwtSettings__Secret` environment variable or through the deployment secret store.
+`JwtSettings:Secret` must be supplied outside tracked configuration. It must contain at least 32 UTF-8 bytes. In Development, ASP.NET Core User Secrets are loaded through the `UserSecretsId` in `src/MechanicShop.Api/MechanicShop.Api.csproj`. In hosted environments, supply it as the `JwtSettings__Secret` environment variable or through the deployment secret store.
 
 Generate and save a local Development key without writing it to shell history:
 
 ```powershell
 $jwtSecret = [Convert]::ToBase64String([Security.Cryptography.RandomNumberGenerator]::GetBytes(32))
-dotnet user-secrets set "JwtSettings:Secret" $jwtSecret --project MechanicShop.Api
+dotnet user-secrets set "JwtSettings:Secret" $jwtSecret --project src/MechanicShop.Api/MechanicShop.Api.csproj
 Remove-Variable jwtSecret
 ```
 

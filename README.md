@@ -34,14 +34,18 @@ flowchart LR
 
 ## Docker
 
-Docker is currently used by the integration tests through Testcontainers, which starts disposable SQL Server and Redis containers. The promoted branch does not contain a Dockerfile or Docker Compose deployment, so there is no Compose startup or stop command yet. Install Docker Desktop or Docker Engine and start the daemon before running the container-backed tests:
+The repository includes a multi-stage Dockerfile for the API and a Docker Compose stack for the API, SQL Server, Redis, Seq, OpenTelemetry Collector, Prometheus, and Grafana. Install Docker Desktop (Linux containers) or Docker Engine with the Compose v2 plugin. To run the container-backed integration tests, Docker must be running as well.
+
+From the repository root, make a local environment file and replace the placeholder secrets before starting the stack:
 
 ~~~powershell
-docker version
-dotnet test tests/MechanicShop.Api.IntegrationTests/MechanicShop.Api.IntegrationTests.csproj
+if (-not (Test-Path 'docker-compose/.env')) { Copy-Item docker-compose/.env.example docker-compose/.env }
+# Edit docker-compose/.env and replace the REPLACE_WITH_... placeholders with local secrets.
+docker compose --env-file docker-compose/.env -f docker-compose/docker-compose.yml -f docker-compose/docker-compose.override.yml config --quiet
+docker compose --env-file docker-compose/.env -f docker-compose/docker-compose.yml -f docker-compose/docker-compose.override.yml up --build -d
 ~~~
 
-See [Docker and containerization documentation](docs/DOCKER.md) for the tracked Docker support, test container lifecycle, limitations, and production recommendations.
+With the example port settings, the API is at `http://localhost:5106`, Seq at `http://localhost:5341`, Prometheus at `http://localhost:9090`, and Grafana at `http://localhost:3000`. Stop the containers and network with `docker compose --env-file docker-compose/.env -f docker-compose/docker-compose.yml -f docker-compose/docker-compose.override.yml down`; named volumes remain. Do not commit the local `.env` file. See [Docker and Docker Compose documentation](docs/DOCKER.md) for architecture, environment configuration, migrations, operations, troubleshooting, and production recommendations.
 
 ### Solution Projects
 
@@ -75,7 +79,7 @@ erDiagram
     WORK_ORDER ||--o| INVOICE : billed_by
 ~~~
 
-AppDbContext uses EF Core. Entity configurations are in MechanicShop.Infrastructure/Date/Configurations, and schema changes are managed with EF Core migrations. During Development startup, ApplicationDbContextInitialiser applies migrations and seeds development data.
+AppDbContext uses EF Core. Entity configurations are in src/MechanicShop.Infrastructure/Date/Configurations, and schema changes are managed with EF Core migrations. During Development startup, ApplicationDbContextInitialiser applies migrations and seeds development data.
 
 Work orders and invoices use EF Core global query filters that apply the current user's branch access scope. Administrative operations that use IgnoreQueryFilters() should be reviewed carefully.
 
@@ -154,20 +158,20 @@ Configure local secrets outside source control. The application reads these sett
 For example, from the repository root:
 
 ~~~powershell
-dotnet user-secrets set "ConnectionStrings:DefaultConnection" "<sql-server-connection-string>" --project MechanicShop.Api
-dotnet user-secrets set "ConnectionStrings:Redis" "localhost:6379" --project MechanicShop.Api
-dotnet user-secrets set "JwtSettings:Secret" "<random-secret-at-least-32-utf8-bytes>" --project MechanicShop.Api
-dotnet user-secrets set "JwtSettings:Issuer" "MechanicShop" --project MechanicShop.Api
-dotnet user-secrets set "JwtSettings:Audience" "MechanicShop.Client" --project MechanicShop.Api
-dotnet user-secrets set "JwtSettings:TokenExpirationInMinutes" "60" --project MechanicShop.Api
-dotnet user-secrets set "AppSettings:CorsPolicyName" "LocalClient" --project MechanicShop.Api
-dotnet user-secrets set "AppSettings:AllowedOrigins:0" "https://localhost:####" --project MechanicShop.Api
-dotnet user-secrets set "EmailSettings:Host" "<smtp-host>" --project MechanicShop.Api
-dotnet user-secrets set "EmailSettings:Port" "587" --project MechanicShop.Api
-dotnet user-secrets set "EmailSettings:SenderName" "MechanicShop" --project MechanicShop.Api
-dotnet user-secrets set "EmailSettings:SenderEmail" "<sender-email>" --project MechanicShop.Api
-dotnet user-secrets set "EmailSettings:Username" "<smtp-username>" --project MechanicShop.Api
-dotnet user-secrets set "EmailSettings:Password" "<smtp-password>" --project MechanicShop.Api
+dotnet user-secrets set "ConnectionStrings:DefaultConnection" "<sql-server-connection-string>" --project src/MechanicShop.Api/MechanicShop.Api.csproj
+dotnet user-secrets set "ConnectionStrings:Redis" "localhost:6379" --project src/MechanicShop.Api/MechanicShop.Api.csproj
+dotnet user-secrets set "JwtSettings:Secret" "<random-secret-at-least-32-utf8-bytes>" --project src/MechanicShop.Api/MechanicShop.Api.csproj
+dotnet user-secrets set "JwtSettings:Issuer" "MechanicShop" --project src/MechanicShop.Api/MechanicShop.Api.csproj
+dotnet user-secrets set "JwtSettings:Audience" "MechanicShop.Client" --project src/MechanicShop.Api/MechanicShop.Api.csproj
+dotnet user-secrets set "JwtSettings:TokenExpirationInMinutes" "60" --project src/MechanicShop.Api/MechanicShop.Api.csproj
+dotnet user-secrets set "AppSettings:CorsPolicyName" "LocalClient" --project src/MechanicShop.Api/MechanicShop.Api.csproj
+dotnet user-secrets set "AppSettings:AllowedOrigins:0" "https://localhost:####" --project src/MechanicShop.Api/MechanicShop.Api.csproj
+dotnet user-secrets set "EmailSettings:Host" "<smtp-host>" --project src/MechanicShop.Api/MechanicShop.Api.csproj
+dotnet user-secrets set "EmailSettings:Port" "587" --project src/MechanicShop.Api/MechanicShop.Api.csproj
+dotnet user-secrets set "EmailSettings:SenderName" "MechanicShop" --project src/MechanicShop.Api/MechanicShop.Api.csproj
+dotnet user-secrets set "EmailSettings:SenderEmail" "<sender-email>" --project src/MechanicShop.Api/MechanicShop.Api.csproj
+dotnet user-secrets set "EmailSettings:Username" "<smtp-username>" --project src/MechanicShop.Api/MechanicShop.Api.csproj
+dotnet user-secrets set "EmailSettings:Password" "<smtp-password>" --project src/MechanicShop.Api/MechanicShop.Api.csproj
 ~~~
 
 Replace the placeholders with values for your local environment. Do not commit passwords, JWT keys, SMTP credentials, or production connection strings.
@@ -178,7 +182,7 @@ From the repository root:
 
 ~~~powershell
 dotnet restore MechanicShop.slnx
-dotnet run --project MechanicShop.Api/MechanicShop.Api.csproj
+dotnet run --project src/MechanicShop.Api/MechanicShop.Api.csproj
 ~~~
 
 The launch profiles configure a local Development environment. /health reports the registered health checks, including SQL Server and Redis. Both services must be available for normal local operation.

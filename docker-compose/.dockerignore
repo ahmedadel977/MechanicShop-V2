@@ -1,0 +1,1 @@
+# The API build context is the solution root (..). Docker uses the root .dockerignore for that context.

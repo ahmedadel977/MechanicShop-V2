@@ -1,0 +1,20 @@
+{
+  "profiles": {
+    "MechanicShop Docker Compose": {
+      "commandName": "DockerCompose",
+      "commandVersion": "1.0",
+      "composeLaunchAction": "LaunchBrowser",
+      "composeLaunchServiceName": "api",
+      "composeLaunchUrl": "{Scheme}://{ServiceIPAddress}:{ServicePort}/health",
+      "serviceActions": {
+        "api": "StartDebugging",
+        "sqlserver": "StartWithoutDebugging",
+        "redis": "StartWithoutDebugging",
+        "seq": "StartWithoutDebugging",
+        "otel-collector": "StartWithoutDebugging",
+        "prometheus": "StartWithoutDebugging",
+        "grafana": "StartWithoutDebugging"
+      }
+    }
+  }
+}

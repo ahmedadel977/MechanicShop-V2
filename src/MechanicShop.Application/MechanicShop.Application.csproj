@@ -1,0 +1,26 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <UserSecretsId>d0f6c956-e3b3-4c26-b109-a2a40bb45184</UserSecretsId>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\MechanicShop.Domain\MechanicShop.Domain.csproj" />
+  </ItemGroup>
+
+	<ItemGroup>
+		<PackageReference Include="FluentValidation" />
+
+		<PackageReference Include="FluentValidation.DependencyInjectionExtensions" />
+
+		<PackageReference Include="Microsoft.EntityFrameworkCore" />
+
+		<PackageReference Include="QuestPDF" />
+	</ItemGroup>
+
+  <ItemGroup>
+    <Folder Include="Features\Billing\NewFolder\" />
+  </ItemGroup>
+
+</Project>

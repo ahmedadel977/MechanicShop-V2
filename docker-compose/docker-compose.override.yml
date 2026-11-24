@@ -1,0 +1,25 @@
+services:
+  api:
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+
+  sqlserver:
+    ports:
+      - "${MSSQL_HOST_PORT:-1433}:1433"
+
+  redis:
+    ports:
+      - "${REDIS_HOST_PORT:-6379}:6379"
+
+  seq:
+    ports:
+      - "${SEQ_HOST_PORT:-5341}:80"
+      - "${SEQ_INGEST_HOST_PORT:-5342}:5341"
+
+  prometheus:
+    ports:
+      - "${PROMETHEUS_HOST_PORT:-9090}:9090"
+
+  grafana:
+    ports:
+      - "${GRAFANA_HOST_PORT:-3000}:3000"

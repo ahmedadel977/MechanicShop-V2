@@ -1,0 +1,37 @@
+root = true
+
+[*]
+charset = utf-8
+end_of_line = crlf
+insert_final_newline = true
+trim_trailing_whitespace = true
+
+[*.cs]
+# Start from a quiet baseline and enable the rules selected below.
+dotnet_analyzer_diagnostic.category-StyleCop.CSharp.SpecialRules.severity = none
+dotnet_analyzer_diagnostic.category-StyleCop.CSharp.SpacingRules.severity = none
+dotnet_analyzer_diagnostic.category-StyleCop.CSharp.ReadabilityRules.severity = none
+dotnet_analyzer_diagnostic.category-StyleCop.CSharp.OrderingRules.severity = none
+dotnet_analyzer_diagnostic.category-StyleCop.CSharp.NamingRules.severity = none
+dotnet_analyzer_diagnostic.category-StyleCop.CSharp.MaintainabilityRules.severity = none
+dotnet_analyzer_diagnostic.category-StyleCop.CSharp.LayoutRules.severity = none
+dotnet_analyzer_diagnostic.category-StyleCop.CSharp.DocumentationRules.severity = none
+
+# Use directives outside namespaces, with System namespaces first.
+stylecop.ordering.usingDirectivesPlacement = outsideNamespace
+dotnet_sort_system_directives_first = true
+
+dotnet_diagnostic.SA1200.severity = suggestion
+dotnet_diagnostic.SA1201.severity = suggestion
+dotnet_diagnostic.SA1202.severity = suggestion
+
+# Modern .NET code commonly prefixes private fields with an underscore.
+dotnet_diagnostic.SA1309.severity = none
+dotnet_diagnostic.SA1313.severity = suggestion
+dotnet_diagnostic.SA1401.severity = warning
+dotnet_diagnostic.SA1502.severity = suggestion
+dotnet_diagnostic.SA1516.severity = suggestion
+
+# Documentation and file headers are advisory during gradual adoption.
+dotnet_diagnostic.SA1600.severity = suggestion
+dotnet_diagnostic.SA1633.severity = none

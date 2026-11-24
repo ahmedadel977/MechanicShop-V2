@@ -1,0 +1,142 @@
+name: mechanicshop
+
+services:
+  api:
+    image: ${API_IMAGE:-mechanicshop-api:local}
+    build:
+      context: ..
+      dockerfile: src/MechanicShop.Api/Dockerfile
+      target: final
+    environment:
+      ASPNETCORE_ENVIRONMENT: ${ASPNETCORE_ENVIRONMENT:-Production}
+      ASPNETCORE_HTTP_PORTS: "8080"
+      ConnectionStrings__DefaultConnection: "Server=sqlserver,1433;Database=MechanicShopDb;User Id=sa;Password=${MSSQL_SA_PASSWORD:?Set MSSQL_SA_PASSWORD in .env};Encrypt=True;TrustServerCertificate=True;MultipleActiveResultSets=True"
+      ConnectionStrings__Redis: redis:6379
+      JwtSettings__Secret: ${JWT_SECRET:?Set JWT_SECRET in .env}
+      OTEL_SERVICE_NAME: MechanicShop.Api
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4317
+      Serilog__WriteTo__1__Args__serverUrl: http://seq
+    ports:
+      - "${API_HTTP_PORT:-8080}:8080"
+    expose:
+      - "8080"
+    depends_on:
+      sqlserver:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      seq:
+        condition: service_started
+      otel-collector:
+        condition: service_started
+    init: true
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    restart: unless-stopped
+
+  sqlserver:
+    image: mcr.microsoft.com/mssql/server:2022-CU28-ubuntu-22.04
+    environment:
+      ACCEPT_EULA: ${MSSQL_ACCEPT_EULA:?Review the SQL Server license and set MSSQL_ACCEPT_EULA=Y in .env}
+      MSSQL_PID: ${MSSQL_PID:-Developer}
+      MSSQL_SA_PASSWORD: ${MSSQL_SA_PASSWORD:?Set MSSQL_SA_PASSWORD in .env}
+    expose:
+      - "1433"
+    volumes:
+      - sqlserver-data:/var/opt/mssql
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - SQLCMDPASSWORD="$${MSSQL_SA_PASSWORD}" /opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -C -Q "SELECT 1" -b -o /dev/null
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 60s
+    restart: unless-stopped
+
+  redis:
+    image: redis:7.4.11-alpine
+    command: ["redis-server", "--appendonly", "yes", "--save", "60", "1"]
+    expose:
+      - "6379"
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+    restart: unless-stopped
+
+  seq:
+    image: datalust/seq:2026.1.17526
+    environment:
+      ACCEPT_EULA: ${SEQ_ACCEPT_EULA:?Review the Seq license and set SEQ_ACCEPT_EULA=Y in .env}
+      SEQ_FIRSTRUN_ADMINUSERNAME: ${SEQ_ADMIN_USER:-admin}
+      SEQ_FIRSTRUN_ADMINPASSWORD: ${SEQ_ADMIN_PASSWORD:?Set SEQ_ADMIN_PASSWORD in .env}
+    expose:
+      - "80"
+      - "5341"
+    volumes:
+      - seq-data:/data
+    restart: unless-stopped
+
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:0.165.0
+    command: ["--config=/etc/otelcol-contrib/config.yaml"]
+    volumes:
+      - ../otel-collector/otel-collector.yml:/etc/otelcol-contrib/config.yaml:ro
+    expose:
+      - "4317"
+      - "4318"
+      - "9464"
+    depends_on:
+      - seq
+    restart: unless-stopped
+
+  prometheus:
+    image: prom/prometheus:v3.15.1
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.path=/prometheus
+      - --storage.tsdb.retention.time=15d
+      - --web.enable-lifecycle
+    volumes:
+      - ../prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus-data:/prometheus
+    expose:
+      - "9090"
+    depends_on:
+      - otel-collector
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:9090/-/healthy"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    restart: unless-stopped
+
+  grafana:
+    image: grafana/grafana:13.3.0
+    environment:
+      GF_SECURITY_ADMIN_USER: ${GRAFANA_ADMIN_USER:-admin}
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:?Set GRAFANA_ADMIN_PASSWORD in .env}
+      GF_USERS_ALLOW_SIGN_UP: "false"
+    volumes:
+      - grafana-data:/var/lib/grafana
+      - ../grafana/provisioning:/etc/grafana/provisioning:ro
+      - ../grafana/dashboards:/var/lib/grafana/dashboards:ro
+    expose:
+      - "3000"
+    depends_on:
+      prometheus:
+        condition: service_started
+    restart: unless-stopped
+
+volumes:
+  sqlserver-data:
+  redis-data:
+  seq-data:
+  prometheus-data:
+  grafana-data:

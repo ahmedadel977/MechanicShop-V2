@@ -1,11 +1,20 @@
 <Solution>
+  <Folder Name="/Solution Items/">
+    <File Path=".dockerignore" />
+    <File Path=".editorconfig" />
+    <File Path=".gitattributes" />
+    <File Path=".gitignore" />
+    <File Path="Directory.Build.props" />
+    <File Path="Directory.Packages.props" />
+    <File Path="README.md" />
+  </Folder>
   <Folder Name="/src/">
-    <Project Path="Contracts/MechanicShop.Contracts.csproj" />
-    <Project Path="MechanicShop.Api/MechanicShop.Api.csproj" />
-    <Project Path="MechanicShop.Application/MechanicShop.Application.csproj" />
-    <Project Path="MechanicShop.Client/MechanicShop.Client.csproj" />
-    <Project Path="MechanicShop.Domain/MechanicShop.Domain.csproj" />
-    <Project Path="MechanicShop.Infrastructure/MechanicShop.Infrastructure.csproj" />
+    <Project Path="src/Contracts/MechanicShop.Contracts.csproj" />
+    <Project Path="src/MechanicShop.Api/MechanicShop.Api.csproj" />
+    <Project Path="src/MechanicShop.Application/MechanicShop.Application.csproj" />
+    <Project Path="src/MechanicShop.Client/MechanicShop.Client.csproj" />
+    <Project Path="src/MechanicShop.Domain/MechanicShop.Domain.csproj" />
+    <Project Path="src/MechanicShop.Infrastructure/MechanicShop.Infrastructure.csproj" />
   </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/MechanicShop.Api.IntegrationTests/MechanicShop.Api.IntegrationTests.csproj" />
@@ -13,5 +22,10 @@
     <Project Path="tests/MechanicShop.Application.UniTests/MechanicShop.Application.UniTests.csproj" />
     <Project Path="tests/MechanicShop.Domain.UniTests/MechanicShop.Domain.UniTests.csproj" />
     <Project Path="tests/MechanicShop.Tests.Common/MechanicShop.Tests.Common.csproj" />
+  </Folder>
+  <Folder Name="/docker-compose/">
+    <Project Path="docker-compose/docker-compose.dcproj">
+      <Build />
+    </Project>
   </Folder>
 </Solution>
