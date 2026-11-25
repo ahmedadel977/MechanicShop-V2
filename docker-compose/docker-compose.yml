@@ -42,6 +42,8 @@ services:
       ACCEPT_EULA: ${MSSQL_ACCEPT_EULA:?Review the SQL Server license and set MSSQL_ACCEPT_EULA=Y in .env}
       MSSQL_PID: ${MSSQL_PID:-Developer}
       MSSQL_SA_PASSWORD: ${MSSQL_SA_PASSWORD:?Set MSSQL_SA_PASSWORD in .env}
+    ports:
+      - "${MSSQL_HOST_PORT:-1433}:1433"
     expose:
       - "1433"
     volumes:

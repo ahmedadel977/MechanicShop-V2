@@ -220,3 +220,7 @@ Coverlet.MTP is referenced by the test projects. A coverage report was not gener
 - Run the complete solution test suite after the remaining local changes are reconciled.
 - Generate and retain a fresh coverage report before publishing coverage percentages.
 - Review secrets, CORS origins, database settings, and external service settings for the target environment.
+
+## CI/CD Pipeline
+
+Automated Build, Test and Security Verification using GitHub Actions.
