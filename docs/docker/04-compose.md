@@ -1,22 +1,41 @@
-# 4. Compose وبيئات التشغيل
+# 4. Compose and Runtime Environments
 
-Compose يعرّف كل خدمة كحاوية مستقلة. `depends_on` ينتظر صحة SQL وRedis قبل بدء API، بينما Seq وCollector يعتمدان على ترتيب بدء الحاوية فقط. `restart: unless-stopped` يعيد تشغيل الخدمة بعد الانهيار أو إعادة تشغيل المحرك.
+Compose defines each service as an independent container. `depends_on` waits for SQL and Redis health checks before starting the API, while Seq and Collector rely only on container startup order. `restart: unless-stopped` automatically restarts a service after a crash or Docker Engine restart.
 
-## الملف الأساسي وملف override
+## Main Compose File and Override File
 
-- `docker-compose/docker-compose.yml`: الخدمات والشبكة والـvolumes والاتصالات الداخلية وربط API بمنفذ قابل للضبط.
-- `docker-compose/docker-compose.override.yml`: منافذ التطوير على المضيف ويضبط `ASPNETCORE_ENVIRONMENT=Development`.
-- `docker-compose/docker-compose.dcproj`: مشروع Visual Studio الذي يشغّل Compose ويحمّل `docker-compose/.env`.
+- `docker-compose/docker-compose.yml`: Defines services, networks, volumes, internal connections, and API port binding through configurable variables.
+- `docker-compose/docker-compose.override.yml`: Exposes development ports on the host machine and sets `ASPNETCORE_ENVIRONMENT=Development`.
+- `docker-compose/docker-compose.dcproj`: The Visual Studio project that runs Compose and loads `docker-compose/.env`.
 
-في التطوير يُستخدم المنفذ 5106 للـAPI، و1433 لـSQL، و6379 لـRedis، و5341 لـSeq، و9090 لـPrometheus، و3000 لـGrafana. غيّرها من `docker-compose/.env` عند الحاجة. لا تُفتح منافذ SQL وRedis على المضيف في الملف الأساسي.
+The development environment uses the following default ports:
 
-## إعدادات Compose
+- **API:** 5106
+- **SQL Server:** 1433
+- **Redis:** 6379
+- **Seq:** 5341
+- **Prometheus:** 9090
+- **Grafana:** 3000
 
-`build.context: ..` يجعل جذر الحل متاحًا من مجلد Compose. `dockerfile` يشير إلى `src/MechanicShop.Api/Dockerfile` نسبةً إلى build context. `environment` يمرر إعدادات .NET عبر تحويل `__` إلى `:`. `expose` يوثق منافذ الخدمات داخل الشبكة؛ `ports` ينشرها على جهاز التطوير. مسارات bind mounts مثل `./prometheus/prometheus.yml` تُحل نسبةً إلى ملف Compose الأساسي. `healthcheck` يفحص SQL وRedis وPrometheus وصحة API.
+These ports can be changed through `docker-compose/.env` when needed. SQL Server and Redis ports are not exposed to the host in the main Compose file.
 
-يُستخدم ملف `.env` للاستبدال داخل YAML، ولا يعني وحده أن كل متغير سيصبح بيئة داخل الحاوية. `environment` هو الذي يمرر القيم للعملية. لا يوجد `env_file:` في هذا الإعداد حتى لا تُمرّر متغيرات المضيف كلها للتطبيق.
+## Compose Configuration
 
-## تشغيل وتطوير في Visual Studio 2026
+- `build.context: ..` makes the solution root available as the Docker build context.
+- `dockerfile` points to `src/MechanicShop.Api/Dockerfile`, relative to the build context.
+- `environment` passes .NET configuration settings to the application, using `__` as the equivalent of `:` in configuration keys.
+- `expose` documents ports available to other services within the Docker network.
+- `ports` publishes container ports to the development machine.
+- Bind mount paths such as `./prometheus/prometheus.yml` are resolved relative to the main Compose file.
+- `healthcheck` verifies the health of SQL Server, Redis, Prometheus, and the API.
+
+The `.env` file is used for variable substitution inside the Compose YAML files. However, defining a variable in `.env` does not automatically make it an environment variable inside the container.
+
+The `environment` section is responsible for passing configuration values to the container's application process.
+
+There is no `env_file:` configuration in this setup, preventing all host environment variables from being automatically passed to the application.
+
+## Running and Developing with Visual Studio 2026
 
 ```powershell
 Set-Location docker-compose
@@ -26,4 +45,20 @@ docker compose ps
 docker compose logs -f api
 ```
 
-تم تسجيل مشروع Compose في الحل، ويربط مشروع API بملف `docker-compose.dcproj` عبر `DockerComposeProjectPath`. ملف `Properties/launchSettings.json` يبدأ API في وضع Debug وباقي الخدمات دون Debug، ويفتح `/health`. خاصية `DependencyAwareStart` تفعّل انتظار health checks في إصدارات Visual Studio الحديثة. اختر `docker-compose` كـStartup Project واضغط F5؛ يلزم تشغيل Docker Desktop وقبول التراخيص وتعبئة الأسرار أولًا.
+The Compose project has been registered in the solution and connects the API project to `docker-compose.dcproj` through `DockerComposeProjectPath`.
+
+The `Properties/launchSettings.json` file configures Visual Studio to:
+
+- Start the API in Debug mode.
+- Start the remaining services without Debug mode.
+- Open the `/health` endpoint automatically.
+
+The `DependencyAwareStart` property enables health-check-aware startup in supported recent Visual Studio versions.
+
+To run the application:
+
+1. Set `docker-compose` as the Startup Project.
+2. Make sure Docker Desktop is running.
+3. Accept the required licenses.
+4. Configure all required secrets.
+5. Press **F5** to start debugging.
