@@ -1,29 +1,36 @@
-# تشغيل MechanicShop باستخدام Docker
+# Running MechanicShop with Docker
 
-هذا الدليل يشرح تشغيل API وقاعدة البيانات والتخزين المؤقت والمراقبة. ملفات التشغيل ومشروع Visual Studio موجودة في `docker-compose/`، بينما صورة التطبيق تُبنى من مشروع `src/MechanicShop.Api` مع سياق بناء جذر الحل.
+This guide explains how to run the API, database, caching service, and monitoring stack using Docker.
 
-## البنية
+The Docker configuration files and Visual Studio Compose project are located in `docker-compose/`, while the application image is built from `src/MechanicShop.Api` using the solution root as the build context.
+
+## Architecture
 
 ```mermaid
 flowchart LR
   Browser -->|HTTP 5106| API[MechanicShop.Api]
-  API -->|1433 داخلي| SQL[(SQL Server)]
-  API -->|6379 داخلي| Redis[(Redis)]
-  API -->|سجلات| Seq[Seq]
+  API -->|1433 Internal| SQL[(SQL Server)]
+  API -->|6379 Internal| Redis[(Redis)]
+  API -->|Logs| Seq[Seq]
   API -->|OTLP 4317| OTel[OpenTelemetry Collector]
   OTel -->|OTLP HTTP| Seq
-  OTel -->|مقاييس 9464| Prom[Prometheus]
+  OTel -->|Metrics 9464| Prom[Prometheus]
   Grafana --> Prom
 ```
 
-ملفا `docker-compose/docker-compose.yml` و`docker-compose/docker-compose.override.yml` يعرّفان الخدمات والشبكة الداخلية والتخزين الدائم ومنافذ التطوير. شغّل أوامر Compose من مجلد `docker-compose` حتى يحمّل `.env` المحلي تلقائيًا.
+The following files define the services, internal network, persistent storage, and development ports:
 
-## التشغيل لأول مرة
+- `docker-compose/docker-compose.yml`
+- `docker-compose/docker-compose.override.yml`
 
-1. انسخ `docker-compose/.env.example` إلى `docker-compose/.env`. يوجد ملف `.env` محلي مستبعد من Git، ويمكنك تعديله مباشرة.
-2. راجع شروط تراخيص SQL Server وSeq. بعد موافقتك اكتب `Y` في `MSSQL_ACCEPT_EULA` و`SEQ_ACCEPT_EULA`.
-3. أضف كلمة مرور SQL قوية، وكلمة مرور Seq وGrafana، وJWT secret عشوائيًا لا يقل عن 32 بايت UTF-8. لا تضع القيم في Git أو في التوثيق.
-4. شغّل من مجلد `docker-compose`:
+Run Compose commands from the `docker-compose` directory to automatically load the local `.env` file.
+
+## First-Time Setup
+
+1. Copy `docker-compose/.env.example` to `docker-compose/.env`. A local `.env` file already exists and is excluded from Git, so you can modify it directly.
+2. Review the SQL Server and Seq license agreements. After accepting them, set `MSSQL_ACCEPT_EULA` and `SEQ_ACCEPT_EULA` to `Y`.
+3. Configure a strong SQL Server password, Seq password, Grafana password, and a random JWT secret containing at least 32 bytes of UTF-8 data. Never commit these values to Git or include them in documentation.
+4. Run the following commands from the `docker-compose` directory:
 
 ```powershell
 docker compose config --quiet
@@ -31,43 +38,76 @@ docker compose up --build -d
 docker compose ps
 ```
 
-العنوان المحلي للـ API هو `http://localhost:5106`، وفحص الصحة `http://localhost:5106/health`. واجهات الأدوات: Seq على `http://localhost:5341`، Prometheus على `http://localhost:9090`، وGrafana على `http://localhost:3000`.
+### Local Access
 
-لتغيير المنافذ عدّل متغيرات `*_HOST_PORT` في `.env`. عند ظهور خطأ تعارض منفذ استخدم `docker compose ps` و`Get-NetTCPConnection` لمعرفة العملية التي تستخدمه.
+| Service | URL |
+|---|---|
+| API | http://localhost:5106 |
+| API Health Check | http://localhost:5106/health |
+| Seq | http://localhost:5341 |
+| Prometheus | http://localhost:9090 |
+| Grafana | http://localhost:3000 |
 
-## ملفات الإعداد
+To change the ports, modify the corresponding `*_HOST_PORT` variables in `.env`.
 
-| الملف | الغرض |
-| --- | --- |
-| `src/MechanicShop.Api/Dockerfile` | بناء ونشر صورة Linux متعددة المراحل تعمل كمستخدم غير root. |
-| `docker-compose/docker-compose.yml` | تعريف API وSQL Server وRedis وSeq وCollector وPrometheus وGrafana. |
-| `docker-compose/docker-compose.override.yml` | ربط منافذ الخدمات على المضيف لتطوير محلي. |
-| `docker-compose/docker-compose.dcproj` | مشروع Visual Studio 2026 وملف إعداد Compose Environment. |
-| `docker-compose/.env.example` | أسماء الإعدادات المطلوبة وقيم منافذ افتراضية بلا أسرار. |
-| `.dockerignore` في جذر الحل | يستبعد الملفات الحساسة والمخرجات من سياق بناء API. الملف داخل `docker-compose/` تنظيمي فقط، لأن سياق البناء هو جذر الحل. |
-| `docker-compose/otel-collector/otel-collector.yml` | استقبال traces/metrics وتمريرها إلى الوجهات. |
-| `docker-compose/prometheus/prometheus.yml` | أهداف جمع المقاييس. |
-| `docker-compose/grafana/provisioning/` | إعداد مصدر البيانات ولوحات Grafana تلقائيًا. |
+If a port conflict occurs, use `docker compose ps` and `Get-NetTCPConnection` to identify the process occupying that port.
 
-ملف `docker-compose/.dockerignore` موجود ضمن مشروع Visual Studio حسب التنظيم المطلوب، لكنه لا يتحكم في build context. Docker يقرأ `D:\MechanicShop\.dockerignore` لأن السياق المحدد هو مجلد الحل (`..` من مجلد Compose).
+## Configuration Files
 
-## قاعدة البيانات والترقيات
+| File | Purpose |
+|---|---|
+| `src/MechanicShop.Api/Dockerfile` | Builds and publishes a multi-stage Linux image that runs as a non-root user. |
+| `docker-compose/docker-compose.yml` | Defines API, SQL Server, Redis, Seq, Collector, Prometheus, and Grafana services. |
+| `docker-compose/docker-compose.override.yml` | Maps service ports to the host machine for local development. |
+| `docker-compose/docker-compose.dcproj` | Visual Studio 2026 project and Compose Environment configuration. |
+| `docker-compose/.env.example` | Documents required configuration variables and default port values without exposing secrets. |
+| `.dockerignore` at the solution root | Excludes sensitive files and build outputs from the API build context. The file inside `docker-compose/` is organizational only because the build context is the solution root. |
+| `docker-compose/otel-collector/otel-collector.yml` | Configures trace and metric reception and forwards telemetry to the appropriate destinations. |
+| `docker-compose/prometheus/prometheus.yml` | Defines metric scraping targets. |
+| `docker-compose/grafana/provisioning/` | Automatically configures Grafana data sources and dashboards. |
 
-يستخدم التطبيق عنوان `sqlserver,1433` وRedis على `redis:6379` داخل شبكة Compose؛ `localhost` داخل الحاوية يعني الحاوية نفسها. التطبيق يهيئ قاعدة البيانات تلقائيًا في بيئة Development فقط. في Production طبّق EF Core migrations كخطوة نشر معتمدة قبل تشغيل نسخة التطبيق الجديدة، وخذ نسخة احتياطية وفق إجراءات التشغيل لديك.
+The `docker-compose/.dockerignore` file is included in the Visual Studio project structure as requested, but it does not control the Docker build context.
 
-المعرّف الافتراضي `MSSQL_PID=Developer` مناسب للتطوير والاختبار فقط؛ اختر إصدار SQL وترخيصًا مناسبين للإنتاج. لا تستخدم Developer في الإنتاج التجاري.
+Docker reads `D:\MechanicShop\.dockerignore` because the configured build context is the solution root (`..` relative to the Compose directory).
 
-## إيقاف الخدمات
+## Database and Migrations
+
+The application connects to SQL Server using `sqlserver,1433` and Redis using `redis:6379` within the Docker Compose network.
+
+Inside a container, `localhost` refers to the container itself, not another service.
+
+The application automatically initializes the database in the Development environment only.
+
+In Production, apply EF Core migrations as an approved deployment step before starting the new application version. Make sure to create a database backup according to your operational procedures.
+
+The default `MSSQL_PID=Developer` configuration is suitable for development and testing only.
+
+Choose an appropriate SQL Server edition and license for production. Do not use the Developer edition in commercial production environments.
+
+## Stopping Services
 
 ```powershell
 docker compose down
 ```
 
-هذا يزيل الحاويات والشبكة ويُبقي البيانات في named volumes. لا تستخدم `docker compose down --volumes` إلا إذا كنت تقصد حذف بيانات SQL وRedis وSeq وPrometheus وGrafana نهائيًا.
+This command removes containers and the Compose network while preserving data stored in named volumes.
 
+**Warning:** Do not use `docker compose down --volumes` unless you intentionally want to permanently delete SQL Server, Redis, Seq, Prometheus, and Grafana volume data.
 
-## حدود التحقق المحلي
+## Local Verification Results
 
-في آخر تحقق محلي شُغلت الخدمات بنجاح بعد تصحيح وسم صورة OpenTelemetry إلى `0.165.0`. نجح `docker compose config --quiet` و`docker compose up -d --build`؛ API وSQL Server وRedis وPrometheus أظهرت حالة `healthy`، وفحص `/health` أعاد SQL وRedis بحالة سليمة، كما أعاد Prometheus وGrafana HTTP 200. Collector أكد جاهزيته في سجله، وواجهة Seq استجابت HTTP 200.
+During the latest local verification, all services started successfully after correcting the OpenTelemetry image tag to `0.165.0`.
 
-مشروع Visual Studio Compose بُني بنجاح عبر MSBuild 2026، لكن تجربة ضغط F5 من واجهة Visual Studio نفسها لم تُنفذ آليًا.
+The following checks were completed successfully:
+
+- `docker compose config --quiet` completed successfully.
+- `docker compose up -d --build` completed successfully.
+- API, SQL Server, Redis, and Prometheus reported `healthy` status.
+- The `/health` endpoint reported healthy SQL Server and Redis connections.
+- Prometheus and Grafana returned HTTP 200.
+- The Collector confirmed successful startup in its logs.
+- The Seq web interface returned HTTP 200.
+
+The Visual Studio Compose project also built successfully using MSBuild 2026.
+
+However, pressing F5 directly from the Visual Studio interface was not tested automatically.
