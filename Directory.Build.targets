@@ -1,0 +1,8 @@
+<Project>
+  <ItemGroup Condition="'$(MSBuildProjectName)' == 'MechanicShop.Api.IntegrationTests'
+    Or '$(MSBuildProjectName)' == 'MechanicShop.Domain.UnitTests'
+    Or '$(MSBuildProjectName)' == 'MechanicShop.Application.UnitTests'
+    Or '$(MSBuildProjectName)' == 'MechanicShop.Application.SubcutaneousTests'">
+    <PackageReference Include="Microsoft.Testing.Extensions.TrxReport" />
+  </ItemGroup>
+</Project>
