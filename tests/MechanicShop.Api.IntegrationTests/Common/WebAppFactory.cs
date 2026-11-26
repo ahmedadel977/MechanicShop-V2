@@ -60,11 +60,13 @@ public class WebAppFactory : WebApplicationFactory<IAssemblyMarker>, IAsyncLifet
     public async Task UnpauseSqlContainerAsync()
     {
         await _dbContainer.UnpauseAsync();
+        SqlConnection.ClearAllPools();
 
         var connectionString = new SqlConnectionStringBuilder(
             _databaseConnectionString ?? throw new InvalidOperationException("SQL Server has not been initialized."))
         {
-            ConnectTimeout = 1
+            ConnectTimeout = 1,
+            Pooling = false
         }.ConnectionString;
         var cancellationToken = TestContext.Current.CancellationToken;
         var deadline = DateTime.UtcNow.AddSeconds(60);
