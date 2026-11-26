@@ -1,20 +1,104 @@
-name: Security and verification
+name: Security and Verification
 
 on:
   push:
+    branches:
+      - master
+      - develop
+
+
   pull_request:
+    branches:
+      - master
+      - develop
+
+  workflow_dispatch:
 
 permissions:
   contents: read
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
+
+  # ==========================================
+  # 1. Build, Test & Code Quality
+  # ==========================================
+
   verify:
+    name: Build, Test & Quality Checks
+
     runs-on: ubuntu-latest
+
     steps:
+
+      # Checkout Repository
       - name: Checkout
         uses: actions/checkout@v7
         with:
           fetch-depth: 0
+
+      # Setup .NET SDK
+      - name: Set up .NET
+        uses: actions/setup-dotnet@v6
+        with:
+          global-json-file: global.json
+
+      # Restore Dependencies
+      - name: Restore
+        run: |
+          dotnet restore MechanicShop.slnx \
+            -p:RestoreProjectFilterMode=inclusionlist
+
+      # Check Code Formatting
+      - name: Check Code Formatting
+        run: |
+          dotnet format MechanicShop.slnx \
+            --verify-no-changes \
+            --no-restore
+
+      # Build Solution
+      - name: Build
+        run: |
+          dotnet build MechanicShop.slnx \
+            --no-restore \
+            --configuration Release
+
+      # Run Automated Tests
+      - name: Test
+        run: |
+          dotnet test MechanicShop.slnx \
+            --no-build \
+            --configuration Release \
+            --logger "trx;LogFileName=test-results.trx" \
+            --results-directory TestResults
+
+      # Upload Test Results
+      - name: Upload Test Results
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: test-results
+          path: TestResults/**/*.trx
+          if-no-files-found: ignore
+          retention-days: 7
+
+
+  # ==========================================
+  # 2. Dependency Security
+  # ==========================================
+
+  dependency-security:
+    name: Dependency Vulnerability Scan
+
+    runs-on: ubuntu-latest
+
+    steps:
+
+      - name: Checkout
+        uses: actions/checkout@v7
 
       - name: Set up .NET
         uses: actions/setup-dotnet@v6
@@ -22,27 +106,78 @@ jobs:
           global-json-file: global.json
 
       - name: Restore
-        run: dotnet restore MechanicShop.slnx -p:RestoreProjectFilterMode=inclusionlist
+        run: |
+          dotnet restore MechanicShop.slnx \
+            -p:RestoreProjectFilterMode=inclusionlist
 
-      - name: Build
-        run: dotnet build MechanicShop.slnx --no-restore
-
-      - name: Test
-        run: dotnet test MechanicShop.slnx --no-build
-
-      - name: Check vulnerable packages
+      - name: Check Vulnerable NuGet Packages
         shell: bash
         run: |
+
           while IFS= read -r -d '' project; do
-            audit_output="$(dotnet list "$project" package --vulnerable --include-transitive 2>&1)"
+
+            echo "Scanning: $project"
+
+            audit_output="$(
+              dotnet list "$project" package \
+                --vulnerable \
+                --include-transitive 2>&1
+            )"
+
             printf '%s\n' "$audit_output"
-            if printf '%s\n' "$audit_output" | grep -Eiq 'Severity:[[:space:]]*(Critical|High|Moderate|Low)'; then
-              echo "Vulnerable NuGet packages were reported."
+
+            if printf '%s\n' "$audit_output" |
+              grep -Eiq \
+              'has the following vulnerable packages|Severity:[[:space:]]*(Critical|High|Moderate|Low)'; then
+
+              echo "::error::Vulnerable NuGet packages found in $project"
+
               exit 1
             fi
+
           done < <(find src tests -name '*.csproj' -print0)
 
-      - name: Scan repository for secrets
+
+  # ==========================================
+  # 3. Repository Secret Scanning
+  # ==========================================
+
+  secret-scanning:
+    name: Secret Scanning
+
+    runs-on: ubuntu-latest
+
+    steps:
+
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Scan Repository for Secrets
         uses: gitleaks/gitleaks-action@v3
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+
+  # ==========================================
+  # 4. Docker Build Validation
+  # ==========================================
+
+  docker-validation:
+    name: Docker Build Validation
+
+    runs-on: ubuntu-latest
+
+    steps:
+
+      - name: Checkout
+        uses: actions/checkout@v7
+
+
+      - name: Build Docker Image
+        run: |
+          docker build \
+            -t mechanicshop:ci \
+            -f src/MechanicShop.Api/Dockerfile \
+            .
