@@ -61,23 +61,11 @@ jobs:
             --configuration Release
 
       # Run Automated Tests
-      - name: Test
-        run: |
-          dotnet test MechanicShop.slnx \
-            --no-build \
-            --configuration Release \
-            --logger "trx;LogFileName=test-results.trx" \
-            --results-directory TestResults
+       name: Test
+        run: dotnet test MechanicShop.slnx --no-build
 
-      # Upload Test Results
-      - name: Upload Test Results
-        if: always()
-        uses: actions/upload-artifact@v6
-        with:
-          name: test-results
-          path: TestResults/**/*.trx
-          if-no-files-found: ignore
-          retention-days: 7
+
+    
 
 
   # ==========================================
