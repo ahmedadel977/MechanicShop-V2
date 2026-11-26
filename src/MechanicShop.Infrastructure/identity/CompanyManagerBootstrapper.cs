@@ -39,6 +39,7 @@ public sealed class CompanyManagerBootstrapper(
         if (existingUser is not null)
         {
             await EnsureExistingAccountIsCompanyManagerAsync(existingUser, cancellationToken);
+            await ApplyConfiguredPasswordAsync(existingUser);
             return;
         }
 
@@ -52,7 +53,11 @@ public sealed class CompanyManagerBootstrapper(
         }
 
         var credentialPath = GetCredentialPath(email);
-        var credentials = await ReadOrCreateCredentialsAsync(email, credentialPath, cancellationToken);
+        var credentials = await ReadOrCreateCredentialsAsync(
+            email,
+            credentialPath,
+            configuration["Bootstrap:CompanyManagerPassword"],
+            cancellationToken);
         var employeeResult = Employee.Create(
             credentials.EmployeeId,
             "Company",
@@ -94,6 +99,24 @@ public sealed class CompanyManagerBootstrapper(
         logger.LogInformation("Initial Company Manager account and employee record were created.");
     }
 
+    private async Task ApplyConfiguredPasswordAsync(AppUser user)
+    {
+        var password = configuration["Bootstrap:CompanyManagerPassword"];
+        if (string.IsNullOrWhiteSpace(password))
+        {
+            return;
+        }
+
+        var resetToken = await userManager.GeneratePasswordResetTokenAsync(user);
+        var result = await userManager.ResetPasswordAsync(user, resetToken, password);
+        if (!result.Succeeded)
+        {
+            throw new InvalidOperationException(FormatIdentityFailure("reset configured Company Manager password", result));
+        }
+
+        logger.LogInformation("Configured password was applied to the existing Company Manager account.");
+    }
+
     private async Task EnsureExistingAccountIsCompanyManagerAsync(
         AppUser user,
         CancellationToken cancellationToken)
@@ -119,6 +142,7 @@ public sealed class CompanyManagerBootstrapper(
     private static async Task<BootstrapCredentials> ReadOrCreateCredentialsAsync(
         string email,
         string credentialPath,
+        string? configuredPassword,
         CancellationToken cancellationToken)
     {
         if (File.Exists(credentialPath))
@@ -133,10 +157,14 @@ public sealed class CompanyManagerBootstrapper(
                 throw new InvalidOperationException("The local bootstrap credential file is invalid or belongs to another email.");
             }
 
-            return existingCredentials;
+            return string.IsNullOrWhiteSpace(configuredPassword)
+                ? existingCredentials
+                : existingCredentials with { Password = configuredPassword };
         }
 
-        var password = Convert.ToBase64String(RandomNumberGenerator.GetBytes(48));
+        var password = string.IsNullOrWhiteSpace(configuredPassword)
+            ? Convert.ToBase64String(RandomNumberGenerator.GetBytes(48))
+            : configuredPassword;
         var credentials = new BootstrapCredentials(email, password, Guid.NewGuid());
         var directory = Path.GetDirectoryName(credentialPath)
             ?? throw new InvalidOperationException("The local bootstrap credential directory is invalid.");

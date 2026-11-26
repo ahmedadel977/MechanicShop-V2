@@ -9,17 +9,27 @@ services:
       target: final
     environment:
       ASPNETCORE_ENVIRONMENT: ${ASPNETCORE_ENVIRONMENT:-Production}
-      ASPNETCORE_HTTP_PORTS: "8080"
+      ASPNETCORE_URLS: "http://+:8080;https://+:8443"
+      ASPNETCORE_Kestrel__Certificates__Default__Path: /https/mechanicshop.pfx
+      ASPNETCORE_Kestrel__Certificates__Default__Password: ${HTTPS_CERT_PASSWORD:?Set HTTPS_CERT_PASSWORD in .env}
       ConnectionStrings__DefaultConnection: "Server=sqlserver,1433;Database=MechanicShopDb;User Id=sa;Password=${MSSQL_SA_PASSWORD:?Set MSSQL_SA_PASSWORD in .env};Encrypt=True;TrustServerCertificate=True;MultipleActiveResultSets=True"
       ConnectionStrings__Redis: redis:6379
       JwtSettings__Secret: ${JWT_SECRET:?Set JWT_SECRET in .env}
+      Bootstrap__CompanyManagerEmail: ${BOOTSTRAP_COMPANY_MANAGER_EMAIL:-}
+      Bootstrap__CompanyManagerPassword: ${BOOTSTRAP_COMPANY_MANAGER_PASSWORD:-}
       OTEL_SERVICE_NAME: MechanicShop.Api
       OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4317
       Serilog__WriteTo__1__Args__serverUrl: http://seq
     ports:
-      - "${API_HTTP_PORT:-8080}:8080"
+      - "7169:8443"
     expose:
       - "8080"
+      - "8443"
+    volumes:
+      - type: bind
+        source: ${HTTPS_CERT_PATH:?Set HTTPS_CERT_PATH in .env}
+        target: /https/mechanicshop.pfx
+        read_only: true
     depends_on:
       sqlserver:
         condition: service_healthy

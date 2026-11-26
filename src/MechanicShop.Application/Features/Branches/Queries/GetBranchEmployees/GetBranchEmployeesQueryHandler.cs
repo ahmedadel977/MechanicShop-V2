@@ -39,8 +39,8 @@ public sealed class GetBranchEmployeesQueryHandler(
                     employee.Role,
                     employee.AccessScope,
                     membership.IsDefault))
-            .OrderBy(employee => employee.Name)
             .ToListAsync(cancellationToken);
-        return employees;
+
+        return employees.OrderBy(employee => employee.Name).ToList();
     }
 }

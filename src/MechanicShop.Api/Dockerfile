@@ -2,13 +2,13 @@
 FROM mcr.microsoft.com/dotnet/aspnet:10.0.12 AS base
 WORKDIR /app
 ENV ASPNETCORE_HTTP_PORTS=8080
-EXPOSE 8080
+EXPOSE 8080 8443
 USER 0
 RUN apt-get update \
     && apt-get install --no-install-recommends -y curl \
     && rm -rf /var/lib/apt/lists/*
 HEALTHCHECK --interval=30s --timeout=5s --start-period=90s --retries=5 \
-    CMD curl --fail --silent --show-error --max-time 3 http://127.0.0.1:8080/health || exit 1
+    CMD curl --fail --insecure --silent --show-error --max-time 3 https://127.0.0.1:8443/health || exit 1
 USER $APP_UID
 
 # Build from the solution root so shared props and every referenced project are available.

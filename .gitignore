@@ -8,6 +8,12 @@
 .env.*
 !/.env.example
 !/docker-compose/.env.example
+# Local Docker HTTPS certificates and Compose secrets
+/docker-compose/.env
+/docker-compose/.env.*
+!/docker-compose/.env.example
+/docker-compose/certs/
+/docker-compose/https-certs/
 secrets.json
 appsettings.Development.json
 

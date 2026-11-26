@@ -55,6 +55,8 @@ flowchart LR
 
 From the repository root, create a local environment file and replace all placeholder values with development secrets:
 
+Before building or starting Compose, create and trust the local PFX and set its path/password in the ignored `.env` file using [the HTTPS setup guide](docker-compose/HTTPS.md).
+
 ```powershell
 if (-not (Test-Path 'docker-compose/.env')) { Copy-Item docker-compose/.env.example docker-compose/.env }
 # Edit docker-compose/.env and replace every REPLACE_WITH_... value.
@@ -62,7 +64,7 @@ docker compose --env-file docker-compose/.env -f docker-compose/docker-compose.y
 docker compose --env-file docker-compose/.env -f docker-compose/docker-compose.yml -f docker-compose/docker-compose.override.yml up --build -d
 ```
 
-With the example ports, the API is available at `http://localhost:5106`, Seq at `http://localhost:5341`, Prometheus at `http://localhost:9090`, and Grafana at `http://localhost:3000`.
+The API is available at `https://localhost:7169` and Swagger at `https://localhost:7169/swagger`. It listens on internal HTTP `8080` and HTTPS `8443`, with only HTTPS published to the host. Seq is at `http://localhost:5341`, Prometheus at `http://localhost:9090`, and Grafana at `http://localhost:3000`. See [Docker HTTPS setup](docker-compose/HTTPS.md) for certificate creation, trust, environment variables, and verification commands.
 
 Stop the stack with:
 

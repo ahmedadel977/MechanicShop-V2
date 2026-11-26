@@ -25,8 +25,20 @@ public class OverdueBookingCleanupService(
     {
         using var timer = new PeriodicTimer(TimeSpan.FromMinutes(_appSettings.OverdueBookingCleanupFrequencyMinutes));
 
-        while (await timer.WaitForNextTickAsync(stoppingToken))
+        while (true)
         {
+            try
+            {
+                if (!await timer.WaitForNextTickAsync(stoppingToken))
+                {
+                    return;
+                }
+            }
+            catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
+            {
+                return;
+            }
+
             _logger.LogInformation("Checking overdue work orders at {Now}", _dateTime.GetUtcNow());
 
             try
@@ -59,6 +71,10 @@ public class OverdueBookingCleanupService(
                 {
                     _logger.LogInformation("No overdue work orders found.");
                 }
+            }
+            catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
+            {
+                return;
             }
             catch (Exception ex)
             {

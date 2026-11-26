@@ -1,5 +1,14 @@
 .git
 .vs
+/frontend/
+/src/**/bin/
+/src/**/obj/
+/docker-compose/bin/
+/docker-compose/obj/
+/CodeCovArtifacts/
+/TestResults/
+**/.env
+**/.env.*
 **/bin
 **/obj
 **/TestResults
@@ -19,3 +28,9 @@ UpgradeLog*.XML
 .env.*
 /docker-compose/.env
 /docker-compose/.env.*
+!docker-compose/.env.example
+docker-compose/certs/
+docker-compose/https-certs/
+**/*.pfx
+**/*.pem
+**/*.key

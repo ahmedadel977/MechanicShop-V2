@@ -14,7 +14,7 @@ The Compose project is in `docker-compose/`. The main file defines all services 
 
 ```mermaid
 flowchart LR
-    Browser[Browser / developer] -->|HTTP : API_HTTP_PORT to 8080| API[api\nASP.NET Core]
+    Browser[Browser / developer] -->|HTTPS :7169 to 8443| API[api\nASP.NET Core]
     API -->|SQL Server :1433| SQL[(sqlserver)]
     API -->|Redis :6379| Redis[(redis)]
     API -->|OTLP gRPC :4317| OTel[otel-collector]
@@ -26,17 +26,17 @@ flowchart LR
 
 ### Service inventory
 
-| Service | Image / build | Purpose and internal ports | Host port in development override |
+| Service | Image / build | Purpose and internal ports | Host port from Compose files |
 | --- | --- | --- | --- |
-| `api` | Built from `src/MechanicShop.Api/Dockerfile` | HTTP API and Blazor client on 8080 | `${API_HTTP_PORT:-8080}:8080` |
+| `api` | Built from `src/MechanicShop.Api/Dockerfile` | HTTP 8080 and HTTPS 8443 | `7169:8443` (HTTPS only) |
 | `sqlserver` | SQL Server 2022 CU28 | Application database on 1433 | `${MSSQL_HOST_PORT:-1433}:1433` |
-| `redis` | Redis 7.4.11 Alpine | Cache on 6379; AOF and periodic snapshots enabled | `${REDIS_HOST_PORT:-6379}:6379` |
+| `redis` | Redis 7.4.11 Alpine | Cache on 6379; AOF and periodic snapshots enabled | `${REDIS_HOST_PORT:-6380}:6379` |
 | `seq` | Seq 2026.1.17526 | Log ingestion on 5341; web UI on 80 | UI `${SEQ_HOST_PORT:-5341}:80`; ingestion `${SEQ_INGEST_HOST_PORT:-5342}:5341` |
 | `otel-collector` | OpenTelemetry Collector Contrib 0.165.0 | OTLP gRPC 4317, HTTP 4318, metrics 9464 | Not published to host |
 | `prometheus` | Prometheus 3.15.1 | Metrics UI and query API on 9090; 15-day retention | `${PROMETHEUS_HOST_PORT:-9090}:9090` |
 | `grafana` | Grafana 13.3.0 | Dashboards on 3000 | `${GRAFANA_HOST_PORT:-3000}:3000` |
 
-These mappings come from the checked-in Compose files. Values may be overridden by environment configuration. The default API host port in the Compose file is 8080, while the supplied local `.env.example` chooses 5106.
+The API host mapping is HTTPS only: `7169:8443`. HTTP remains available to containers on port 8080 and is not published to the host. Other service host ports may be overridden in the ignored local `.env` file.
 
 ## 3. Dockerfile, line by line
 
@@ -44,11 +44,11 @@ These mappings come from the checked-in Compose files. Values may be overridden 
 
 1. `FROM mcr.microsoft.com/dotnet/aspnet:10.0.12 AS base` selects the .NET 10 ASP.NET Core runtime for the final image.
 2. `WORKDIR /app` sets the runtime working directory.
-3. `ENV ASPNETCORE_HTTP_PORTS=8080` configures Kestrel's HTTP listener.
-4. `EXPOSE 8080` documents the container port; Compose performs the actual host publication.
+3. `ENV ASPNETCORE_HTTP_PORTS=8080` provides the HTTP default; Compose's `ASPNETCORE_URLS` overrides it to listen on HTTP 8080 and HTTPS 8443.
+4. `EXPOSE 8080 8443` documents both container listeners; Compose publishes HTTPS 8443 on host port 7169.
 5. `USER 0` temporarily switches to root to install the health-check tool.
 6. `RUN apt-get ... curl ...` installs curl and removes apt package lists to reduce leftover image data.
-7. `HEALTHCHECK ... curl ... /health` checks the API every 30 seconds, with a 90-second startup allowance and five retries.
+7. `HEALTHCHECK ... curl --insecure https://127.0.0.1:8443/health` checks the API over its internal HTTPS listener every 30 seconds, with a 90-second startup allowance and five retries. The development certificate is private to this local stack, so the in-container probe skips CA validation.
 8. `USER $APP_UID` drops back to the non-root application user supplied by the .NET base image.
 9. `FROM mcr.microsoft.com/dotnet/sdk:10.0.401 AS build` starts the SDK build stage.
 10. `ARG BUILD_CONFIGURATION=Release` allows the publish configuration to be overridden at build time.
@@ -67,18 +67,18 @@ This is a multi-stage build: SDK tooling and source are in the intermediate buil
 
 ## 4. Compose communication and networking
 
-Compose creates a project-scoped default bridge network. Services can resolve each other by service name, so the API uses `sqlserver:1433` and `redis:6379`; containers should not use `localhost` to reach another service. The `expose` entries document internal ports but do not publish them on the host. Only `ports` entries in the override make services host-accessible during local development.
+Compose creates a project-scoped default bridge network. Services can resolve each other by service name, so the API uses `sqlserver:1433` and `redis:6379`; containers should not use `localhost` to reach another service. The `expose` entries document internal ports but do not publish them on the host. `ports` entries in either Compose file publish services to the host.
 
 ```mermaid
 flowchart TB
     subgraph Host[Developer machine]
         Browser[Browser]
         SQLClient[Optional SQL client]
-        Browser -->|localhost:API_HTTP_PORT| API
+        Browser -->|HTTPS localhost:7169| API
         SQLClient -->|localhost:MSSQL_HOST_PORT| SQL
     end
     subgraph Network[Compose project network]
-        API[api:8080]
+        API[api:8080 HTTP / 8443 HTTPS]
         SQL[sqlserver:1433]
         Cache[redis:6379]
         API -->|ConnectionStrings__DefaultConnection| SQL
@@ -130,12 +130,13 @@ The Compose file requires values for `MSSQL_ACCEPT_EULA`, `MSSQL_SA_PASSWORD`, `
 | --- | --- | --- |
 | `API_IMAGE` | `api` | Optional API image tag; defaults to `mechanicshop-api:local`. |
 | `ASPNETCORE_ENVIRONMENT` | `api` | Defaults to Production in the base file; the development override sets Development. |
-| `API_HTTP_PORT` | `api` | Optional host port mapped to API container port 8080. |
+| `HTTPS_CERT_PATH` | `api` bind mount | Absolute host path to the local PFX; mounted read-only at `/https/mechanicshop.pfx`. |
+| `HTTPS_CERT_PASSWORD` | `api` | Required PFX password; stored only in the ignored local `.env`. |
 | `MSSQL_ACCEPT_EULA` | `sqlserver` | Required explicit SQL Server license acceptance. |
 | `MSSQL_PID` | `sqlserver` | SQL Server edition; defaults to Developer. Review licensing before selecting an edition. |
 | `MSSQL_SA_PASSWORD` | `sqlserver`, API connection | SQL Server `sa` password; used by the API connection string and required. |
 | `MSSQL_HOST_PORT` | `sqlserver` override | Optional host port mapped to 1433. |
-| `REDIS_HOST_PORT` | `redis` override | Optional host port mapped to 6379. |
+| `REDIS_HOST_PORT` | `redis` override | Optional host port mapped to container port 6379; defaults to host port 6380. |
 | `JWT_SECRET` | `api` | Required JWT signing secret; application validation requires at least 32 UTF-8 bytes. |
 | `SEQ_ACCEPT_EULA` | `seq` | Required explicit Seq license acceptance. |
 | `SEQ_ADMIN_USER` | `seq` | First-run Seq administrator name; defaults to `admin`. |
@@ -147,7 +148,7 @@ The Compose file requires values for `MSSQL_ACCEPT_EULA`, `MSSQL_SA_PASSWORD`, `
 | `PROMETHEUS_HOST_PORT` | `prometheus` override | Optional host port mapped to 9090. |
 | `GRAFANA_HOST_PORT` | `grafana` override | Optional host port mapped to 3000. |
 
-The Compose file also sets `ConnectionStrings__DefaultConnection`, `ConnectionStrings__Redis`, `JwtSettings__Secret`, `OTEL_SERVICE_NAME`, `OTEL_EXPORTER_OTLP_ENDPOINT`, `Serilog__WriteTo__1__Args__serverUrl`, and `ASPNETCORE_HTTP_PORTS` directly for the API. These are container configuration keys, not extra values from the supplied `.env.example`.
+The Compose file also sets `ASPNETCORE_URLS` to `http://+:8080;https://+:8443`, configures Kestrel's default certificate path/password, and supplies `ConnectionStrings__DefaultConnection`, `ConnectionStrings__Redis`, `JwtSettings__Secret`, and telemetry/logging settings. These container settings do not change API endpoints or authentication behavior.
 
 Create a local environment file from the example only if one does not already exist. The example uses explicit `REPLACE_WITH_...` placeholders for required passwords; set strong, unique values before starting the stack. The actual local `.env` is ignored by Git and must not be committed or copied into an image. If any credential has been used outside a disposable local setup, rotate it.
 
@@ -178,7 +179,7 @@ The Collector configuration and Prometheus/Grafana provisioning are bind-mounted
 
 Install Docker Desktop (or Docker Engine with the Compose v2 plugin) and ensure the daemon is running. On Windows, Docker Desktop should be configured for Linux containers. Install the .NET 10 SDK if you will build or run the solution outside Docker.
 
-From the repository root, create and edit the local environment file as described above, then validate and start:
+From the repository root, create and edit the local environment file as described above. Create and trust the PFX as shown in [Docker HTTPS setup](../docker-compose/HTTPS.md), then validate and start:
 
 ```powershell
 if (-not (Test-Path 'docker-compose/.env')) { Copy-Item docker-compose/.env.example docker-compose/.env }
@@ -187,7 +188,7 @@ docker compose --env-file docker-compose/.env -f docker-compose/docker-compose.y
 docker compose --env-file docker-compose/.env -f docker-compose/docker-compose.yml -f docker-compose/docker-compose.override.yml up --build -d
 ```
 
-Open the API at `http://localhost:5106` when using the supplied example port. Swagger UI and Scalar are mapped only in Development. Seq is available at `http://localhost:5341`, Prometheus at `http://localhost:9090`, and Grafana at `http://localhost:3000`, subject to host port overrides. The API health endpoint is `http://localhost:5106/health`.
+Open the API over HTTPS at `https://localhost:7169`; Swagger is at `https://localhost:7169/swagger` and health is at `https://localhost:7169/health`. Swagger UI and Scalar are enabled only in Development. Seq is available at `http://localhost:5341`, Prometheus at `http://localhost:9090`, and Grafana at `http://localhost:3000`, subject to host port overrides.
 
 ## 10. Common Docker commands
 
