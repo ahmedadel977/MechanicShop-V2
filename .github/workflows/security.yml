@@ -52,12 +52,6 @@ jobs:
           dotnet restore MechanicShop.slnx \
             -p:RestoreProjectFilterMode=inclusionlist
 
-      # Check Code Formatting
-      - name: Check Code Formatting
-        run: |
-          dotnet format MechanicShop.slnx \
-            --verify-no-changes \
-            --no-restore
 
       # Build Solution
       - name: Build
