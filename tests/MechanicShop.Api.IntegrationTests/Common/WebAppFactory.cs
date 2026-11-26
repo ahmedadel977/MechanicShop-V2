@@ -57,7 +57,38 @@ public class WebAppFactory : WebApplicationFactory<IAssemblyMarker>, IAsyncLifet
 
     public Task PauseSqlContainerAsync() => _dbContainer.PauseAsync();
 
-    public Task UnpauseSqlContainerAsync() => _dbContainer.UnpauseAsync();
+    public async Task UnpauseSqlContainerAsync()
+    {
+        await _dbContainer.UnpauseAsync();
+
+        var connectionString = new SqlConnectionStringBuilder(
+            _databaseConnectionString ?? throw new InvalidOperationException("SQL Server has not been initialized."))
+        {
+            ConnectTimeout = 1
+        }.ConnectionString;
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var deadline = DateTime.UtcNow.AddSeconds(60);
+
+        while (DateTime.UtcNow < deadline)
+        {
+            try
+            {
+                await using var connection = new SqlConnection(connectionString);
+                await connection.OpenAsync(cancellationToken);
+                await using var command = connection.CreateCommand();
+                command.CommandText = "SELECT 1";
+                command.CommandTimeout = 1;
+                await command.ExecuteScalarAsync(cancellationToken);
+                return;
+            }
+            catch (SqlException)
+            {
+                await Task.Delay(TimeSpan.FromSeconds(1), cancellationToken);
+            }
+        }
+
+        throw new TimeoutException("SQL Server did not become ready after the container was unpaused.");
+    }
 
     public Task PauseRedisContainerAsync() => _redisContainer.PauseAsync();
 
