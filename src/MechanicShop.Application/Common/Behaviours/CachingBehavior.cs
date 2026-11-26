@@ -43,13 +43,14 @@ namespace MechanicShop.Application.Common.Behaviours
                 if ( result is IResult res && res.IsSuccess)
                 {
                     await _cache.SetAsync(
-                  cacheKey,
-                  result,
-                  new HybridCacheEntryOptions
-                  {
-                      Expiration = cacheableRequest.Expiration,
-                  },
-                  cancellationToken: ct);
+                        cacheKey,
+                        result,
+                        new HybridCacheEntryOptions
+                        {
+                            Expiration = cacheableRequest.Expiration,
+                        },
+                        tags: cacheableRequest.Tags,
+                        cancellationToken: ct);
                 }
               
 

@@ -48,7 +48,7 @@ app.MapHealthChecks("/health", new HealthCheckOptions
         await context.Response.WriteAsync(
             JsonSerializer.Serialize(response));
     }
-});
+}).CacheOutput("NoCache");
 
 // Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())

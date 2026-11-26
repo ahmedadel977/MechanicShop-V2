@@ -13,6 +13,7 @@ using MechanicShop.Infrastructure.Settings;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.HttpOverrides;
+using Microsoft.AspNetCore.OutputCaching;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.Extensions.Configuration;
 using OpenTelemetry.Metrics;
@@ -54,6 +55,7 @@ public static class DependencyInjection
             options.AddBasePolicy(policy =>
                 policy.Expire(TimeSpan.FromSeconds(60))
                     .SetVaryByHeader("Authorization"));
+            options.AddPolicy("NoCache", policy => policy.NoCache());
         });
 
         return services;

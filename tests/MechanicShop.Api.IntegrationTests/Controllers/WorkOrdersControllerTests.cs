@@ -11,6 +11,7 @@ using MechanicShop.Domain.Workorders.Enums;
 using MechanicShop.Tests.Common.Security;
 
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Caching.Hybrid;
 using Microsoft.Extensions.DependencyInjection;
 
 using Xunit;
@@ -23,12 +24,14 @@ public class WorkOrdersControllerTests : IDisposable
     private readonly AppHttpClient _client;
     private readonly IServiceScope _scope;
     private readonly IAppDbContext _context;
+    private readonly HybridCache _cache;
 
     public WorkOrdersControllerTests(WebAppFactory webAppFactory)
     {
         _client = webAppFactory.CreateAppHttpClient();
         _scope = webAppFactory.CreateScope();
         _context = _scope.ServiceProvider.GetRequiredService<IAppDbContext>();
+        _cache = _scope.ServiceProvider.GetRequiredService<HybridCache>();
     }
 
     public void Dispose() => _scope.Dispose();
@@ -997,6 +1000,7 @@ public class WorkOrdersControllerTests : IDisposable
 
         _context.WorkOrders.Add(workOrder);
         await _context.SaveChangesAsync(TestContext.Current.CancellationToken);
+        await _cache.RemoveByTagAsync("work-order", TestContext.Current.CancellationToken);
 
         var today = DateOnly.FromDateTime(DateTime.UtcNow);
 
@@ -1024,6 +1028,7 @@ public class WorkOrdersControllerTests : IDisposable
         {
             _context.WorkOrders.Remove(workOrder);
             await _context.SaveChangesAsync(TestContext.Current.CancellationToken);
+            await _cache.RemoveByTagAsync("work-order", TestContext.Current.CancellationToken);
         }
     }
 

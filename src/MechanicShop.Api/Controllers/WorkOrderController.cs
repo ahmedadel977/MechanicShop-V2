@@ -262,6 +262,7 @@ public sealed class WorkOrdersController(ISender sender) : ApiController
     }
 
     [HttpGet("schedule/{date}")]
+    [Microsoft.AspNetCore.OutputCaching.OutputCache(PolicyName = "NoCache")]
     [Authorize]
     [ProducesResponseType(typeof(ScheduleDto), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
