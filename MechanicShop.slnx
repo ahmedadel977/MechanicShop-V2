@@ -24,7 +24,6 @@
     <Project Path="src/Contracts/MechanicShop.Contracts.csproj" />
     <Project Path="src/MechanicShop.Api/MechanicShop.Api.csproj" />
     <Project Path="src/MechanicShop.Application/MechanicShop.Application.csproj" />
-    <Project Path="src/MechanicShop.Client/MechanicShop.Client.csproj" />
     <Project Path="src/MechanicShop.Domain/MechanicShop.Domain.csproj" />
     <Project Path="src/MechanicShop.Infrastructure/MechanicShop.Infrastructure.csproj" />
   </Folder>

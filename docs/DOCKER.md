@@ -6,7 +6,7 @@ This guide describes the Docker setup present in this repository. It covers loca
 
 Docker packages an application and its runtime into an image. A container runs an image with isolated processes, filesystem, networking, and configuration. Compose declares a multi-container application so its services, networks, volumes, startup dependencies, and port mappings can be managed together.
 
-MechanicShop's Compose file builds the ASP.NET Core API image and runs it with SQL Server, Redis, Seq, the OpenTelemetry Collector, Prometheus, and Grafana. The Blazor WebAssembly client is served by the API project; there is no separate client container in this Compose setup.
+MechanicShop's Compose file builds the ASP.NET Core API image and runs it with SQL Server, Redis, Seq, the OpenTelemetry Collector, Prometheus, and Grafana. The frontend is maintained separately and is not part of this Compose stack.
 
 ## 2. Architecture in this repository
 
@@ -213,7 +213,7 @@ To stop and remove containers and the network while retaining data, use `down`. 
 2. Validate the Compose model with `config --quiet`.
 3. Run `up --build -d` and wait for SQL Server and Redis health checks.
 4. Follow API logs until migration and startup complete; in Development, database migration and seed initialization occur at startup.
-5. Use the API, Blazor client, and local monitoring tools through the published host ports.
+5. Use the API and local monitoring tools through the published host ports; run the frontend separately.
 6. Make source changes and rebuild the API with `docker compose ... up --build -d api`.
 7. Shut down with `docker compose ... down`; named data remains unless `-v` is supplied.
 

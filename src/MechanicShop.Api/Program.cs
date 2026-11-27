@@ -1,4 +1,3 @@
-using MechanicShop.Api.Components;
 using MechanicShop.Infrastructure.Realtime;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Scalar.AspNetCore;
@@ -14,9 +13,6 @@ using Microsoft.Extensions.DependencyInjection;
 var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
-builder.Services.AddRazorComponents()
-    .AddInteractiveWebAssemblyComponents();
-
 builder.Services
     .AddPresentation(builder.Configuration)
     .AddApplication()
@@ -67,7 +63,6 @@ if (app.Environment.IsDevelopment())
     app.MapScalarApiReference();
 
     await app.InitialiseDatabaseAsync();
-        app.UseWebAssemblyDebugging();
 }
 else
 {
@@ -77,10 +72,6 @@ else
 app.UseCoreMiddlewares(builder.Configuration);
 
 app.MapControllers();
-
-app.UseAntiforgery();
-
-app.MapStaticAssets();
 
 app.MapHub<WorkOrderHub>("/hubs/workorders", options => options.CloseOnAuthenticationExpiration = true);
 

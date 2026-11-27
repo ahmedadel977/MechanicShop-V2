@@ -20,7 +20,6 @@ COPY ["global.json", "NuGet.Config", "Directory.Build.props", "Directory.Package
 COPY ["src/Contracts/MechanicShop.Contracts.csproj", "src/Contracts/"]
 COPY ["src/MechanicShop.Api/MechanicShop.Api.csproj", "src/MechanicShop.Api/"]
 COPY ["src/MechanicShop.Application/MechanicShop.Application.csproj", "src/MechanicShop.Application/"]
-COPY ["src/MechanicShop.Client/MechanicShop.Client.csproj", "src/MechanicShop.Client/"]
 COPY ["src/MechanicShop.Domain/MechanicShop.Domain.csproj", "src/MechanicShop.Domain/"]
 COPY ["src/MechanicShop.Infrastructure/MechanicShop.Infrastructure.csproj", "src/MechanicShop.Infrastructure/"]
 RUN dotnet restore "src/MechanicShop.Api/MechanicShop.Api.csproj"

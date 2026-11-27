@@ -2,7 +2,7 @@
 
 [![CI](https://github.com/ahmedadel977/MechanicShop-V2/actions/workflows/security.yml/badge.svg?branch=master)](https://github.com/ahmedadel977/MechanicShop-V2/actions/workflows/security.yml)
 
-**MechanicShop** is a workshop management platform for coordinating branches, customers, vehicles, employees, repair work, appointments, and billing. It provides a versioned REST API and a Blazor WebAssembly client, with role-aware access control and real-time work-order notifications.
+**MechanicShop** is a workshop management platform for coordinating branches, customers, vehicles, employees, repair work, appointments, and billing. This repository contains the backend: a versioned ASP.NET Core REST API with role-aware access control and real-time work-order notifications. The frontend is maintained in a separate repository.
 
 ## What it does
 
@@ -15,13 +15,14 @@
 
 ## Architecture
 
-The solution separates the client, HTTP API, application use cases, domain rules, and infrastructure. Shared contracts keep API request and response models consistent between the server and client.
+The backend solution separates the HTTP API, application use cases, domain rules, infrastructure, and shared API contracts. The frontend is maintained separately and consumes the versioned API over HTTP and SignalR.
 
 ```mermaid
 flowchart LR
-    Client[Blazor WebAssembly client] --> Contracts[Shared contracts]
-    Client --> Api[ASP.NET Core API]
-    Api --> Contracts
+    Frontend[Frontend - separate repository] -->|HTTP / JSON| Api[ASP.NET Core Web API]
+    Api --> Hub[SignalR: /hubs/workorders]
+    Frontend -->|SignalR| Hub
+    Api --> Contracts[Shared API contracts]
     Api --> Application[Application use cases]
     Api --> Infrastructure[Infrastructure]
     Application --> Domain[Domain rules]
@@ -29,12 +30,11 @@ flowchart LR
     Infrastructure --> Domain
     Infrastructure --> Sql[(SQL Server)]
     Infrastructure --> Redis[(Redis / HybridCache)]
-    Api --> Hub[SignalR: /hubs/workorders]
 ```
 
 ## Technology
 
-- .NET 10, ASP.NET Core, and Blazor WebAssembly
+- .NET 10 and ASP.NET Core Web API
 - Entity Framework Core and SQL Server
 - ASP.NET Core Identity and JWT bearer authentication
 - MediatR and FluentValidation
@@ -123,7 +123,7 @@ Most resource routes use the `/api/v1.0` prefix.
 
 ASP.NET Core Identity manages user accounts, and JWT bearer authentication protects API requests. Authorization policies use authenticated roles and persisted employee and branch membership data. Work-order and invoice queries are scoped to the current user's branch access.
 
-Client-supplied roles, access scopes, or branch identifiers are not trusted as authorization sources. Keep application secrets outside source control and configure allowed CORS origins for each environment.
+Client-supplied roles, access scopes, or branch identifiers are not trusted as authorization sources. Keep application secrets outside source control and configure allowed CORS origins for each environment. The JWT audience value `MechanicShop.Client` is a configured logical identifier for token validation, not a frontend project reference.
 
 ## Tests
 
@@ -154,9 +154,10 @@ The [GitHub Actions workflow](.github/workflows/security.yml) runs on pushes and
 | `src/MechanicShop.Domain` | Domain entities and business rules. |
 | `src/MechanicShop.Infrastructure` | EF Core, SQL Server, Identity, Redis, PDF generation, and integrations. |
 | `src/MechanicShop.Contracts` | Shared API request and response contracts. |
-| `src/MechanicShop.Client` | Blazor WebAssembly user interface. |
 | `tests` | API integration, application, domain, and shared test projects. |
 | `docs` | Operational and Docker Compose documentation. |
+
+This solution contains backend projects only; the frontend is maintained separately.
 
 ## Data model
 
