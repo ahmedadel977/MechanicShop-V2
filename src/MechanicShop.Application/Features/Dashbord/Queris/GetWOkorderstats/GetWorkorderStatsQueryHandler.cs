@@ -11,12 +11,10 @@ namespace MechanicShop.Application.Features.Dashbord.Queris.GetWOkorderstats
     {
         public async Task<Result<TodayWorkOrderStatsDto>> Handle(GetWorkorderStatsQuery request, CancellationToken cancellationToken)
         {
-            var startsOfDay = request.Date.ToDateTime(TimeOnly.MinValue, DateTimeKind.Utc);
-            var endOfDay = request.Date.AddDays(1).ToDateTime(TimeOnly.MinValue, DateTimeKind.Utc);
             var query = context.WorkOrders.Include(x => x.Vehicle!).ThenInclude(x => x!.Customer)
                 .Include(x => x.RepairTasks).ThenInclude(x => x.Parts)
                 .Include(x => x.Invoice)
-                .Where(x => x.StartAtUtc >= startsOfDay && x.StartAtUtc < endOfDay);
+                .Where(x => x.StartAtUtc >= request.FromUtc && x.StartAtUtc < request.ToUtc);
 
             var total = await query.AsNoTracking().CountAsync(cancellationToken);
             if (total == 0)
@@ -24,7 +22,7 @@ namespace MechanicShop.Application.Features.Dashbord.Queris.GetWOkorderstats
                 // return empty stats for zero total
                 var emptyDto = new TodayWorkOrderStatsDto
                 {
-                    Date = request.Date,
+                    Date = DateOnly.FromDateTime(request.FromUtc.UtcDateTime),
                     Total = 0,
                     Scheduled = 0,
                     InProgress = 0,
@@ -73,7 +71,7 @@ namespace MechanicShop.Application.Features.Dashbord.Queris.GetWOkorderstats
 
             var dto = new TodayWorkOrderStatsDto
             {
-                Date = request.Date,
+                Date = DateOnly.FromDateTime(request.FromUtc.UtcDateTime),
                 Total = total,
                 Scheduled = await query.AsNoTracking().CountAsync(x => x.State == WorkOrderState.Scheduled, cancellationToken),
                 InProgress = await query.AsNoTracking().CountAsync(x => x.State == WorkOrderState.InProgress, cancellationToken),

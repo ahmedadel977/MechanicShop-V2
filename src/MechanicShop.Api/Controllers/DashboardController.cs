@@ -19,11 +19,11 @@ public sealed class DashboardController(ISender sender) : ApiController
 {
     [HttpGet("stats")]
     [ProducesResponseType(typeof(TodayWorkOrderStatsDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status500InternalServerError)]
-    public async Task<IActionResult> GetTodayStats([FromQuery] DateOnly? date, CancellationToken ct)
+    public async Task<IActionResult> GetTodayStats([FromQuery(Name = "fromUtc")] DateTimeOffset fromUtc, [FromQuery(Name = "toUtc")] DateTimeOffset toUtc, CancellationToken ct)
     {
-        var statsDate = date ?? DateOnly.FromDateTime(DateTime.UtcNow);
-        var result = await sender.Send(new GetWorkorderStatsQuery(statsDate), ct);
+        var result = await sender.Send(new GetWorkorderStatsQuery(fromUtc, toUtc), ct);
 
         return result.Match(
             response => Ok(response),

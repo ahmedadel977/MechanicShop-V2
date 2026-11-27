@@ -7,9 +7,7 @@ using System.Text;
 
 namespace MechanicShop.Application.Features.Dashbord.Queris.GetWOkorderstats
 {
-    public sealed record GetWorkorderStatsQuery (DateOnly Date) : IRequest<Result<TodayWorkOrderStatsDto>>
+    public sealed record GetWorkorderStatsQuery (DateTimeOffset FromUtc, DateTimeOffset ToUtc) : IRequest<Result<TodayWorkOrderStatsDto>>
     {
     }
-
-
 }

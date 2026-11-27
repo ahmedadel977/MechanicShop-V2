@@ -15,14 +15,14 @@ public class GetWorkOrderStatsQueryHandlerTests(WebAppFactory factory)
     [Fact]
     public async Task Handle_WhenDateHasNoOrders_ShouldReturnZeroedStatistics()
     {
-        var date = new DateOnly(2001, 1, 1);
+        var fromUtc = new DateTimeOffset(new DateOnly(2001, 1, 1).ToDateTime(TimeOnly.MinValue, DateTimeKind.Utc), TimeSpan.Zero);
+        var toUtc = fromUtc.AddDays(1);
 
         var result = await _mediator.Send(
-            new GetWorkorderStatsQuery(date),
+            new GetWorkorderStatsQuery(fromUtc, toUtc),
             TestContext.Current.CancellationToken);
 
         Assert.False(result.IsError);
-        Assert.Equal(date, result.Value.Date);
         Assert.Equal(0, result.Value.Total);
         Assert.Equal(0, result.Value.TotalRevenue);
         Assert.Equal(0, result.Value.TotalPartsCost);
@@ -37,7 +37,8 @@ public class GetWorkOrderStatsQueryHandlerTests(WebAppFactory factory)
         var order = await SubcutaneousTestData.CreateWorkOrderAsync(
             _context,
             cancellationToken: TestContext.Current.CancellationToken);
-        var date = DateOnly.FromDateTime(order.StartAtUtc.UtcDateTime);
+        var fromUtc = order.StartAtUtc;
+        var toUtc = fromUtc.AddDays(1);
         var expectedParts = order.RepairTasks.Sum(task => task.Parts.Sum(part => part.Cost));
         var expectedLabor = order.RepairTasks.Sum(task => task.LaborCost);
         var invoice = InvoiceFactory.CreateInvoice(workOrderId: order.Id).Value;
@@ -46,7 +47,7 @@ public class GetWorkOrderStatsQueryHandlerTests(WebAppFactory factory)
         await _context.SaveChangesAsync(TestContext.Current.CancellationToken);
 
         var result = await _mediator.Send(
-            new GetWorkorderStatsQuery(date),
+            new GetWorkorderStatsQuery(fromUtc, toUtc),
             TestContext.Current.CancellationToken);
 
         Assert.False(result.IsError);
@@ -65,7 +66,9 @@ public class GetWorkOrderStatsQueryHandlerTests(WebAppFactory factory)
     {
         var start = DateTimeOffset.UtcNow.Date.AddDays(2_000).AddHours(9);
         var scheduled = await SubcutaneousTestData.CreateWorkOrderAsync(
-            _context, start, TestContext.Current.CancellationToken);
+            _context,
+            start,
+            TestContext.Current.CancellationToken);
         var inProgress = await SubcutaneousTestData.CreateWorkOrderAsync(
             _context, start.AddHours(2), TestContext.Current.CancellationToken);
         Assert.False(inProgress.UpdateState(WorkOrderState.InProgress).IsError);
@@ -76,6 +79,8 @@ public class GetWorkOrderStatsQueryHandlerTests(WebAppFactory factory)
         var cancelled = await SubcutaneousTestData.CreateWorkOrderAsync(
             _context, start.AddHours(6), TestContext.Current.CancellationToken);
         Assert.False(cancelled.UpdateState(WorkOrderState.Cancelled).IsError);
+        var fromUtc = start;
+        var toUtc = start.AddDays(1);
 
         var firstInvoiceId = Guid.NewGuid();
         var firstInvoice = InvoiceFactory.CreateInvoice(
@@ -101,10 +106,9 @@ public class GetWorkOrderStatsQueryHandlerTests(WebAppFactory factory)
         var laborCost = orders.Sum(order => order.RepairTasks.Sum(task => task.LaborCost));
         const decimal revenue = 315;
         var netProfit = revenue - partsCost - laborCost;
-        var date = DateOnly.FromDateTime(start.Date);
 
         var result = await _mediator.Send(
-            new GetWorkorderStatsQuery(date),
+            new GetWorkorderStatsQuery(fromUtc, toUtc),
             TestContext.Current.CancellationToken);
 
         Assert.False(result.IsError);
@@ -132,12 +136,13 @@ public class GetWorkOrderStatsQueryHandlerTests(WebAppFactory factory)
         var order = await SubcutaneousTestData.CreateWorkOrderAsync(
             _context,
             cancellationToken: TestContext.Current.CancellationToken);
-        var date = DateOnly.FromDateTime(order.StartAtUtc.UtcDateTime);
+        var fromUtc = order.StartAtUtc;
+        var toUtc = fromUtc.AddDays(1);
         var partsCost = order.RepairTasks.Sum(task => task.Parts.Sum(part => part.Cost));
         var laborCost = order.RepairTasks.Sum(task => task.LaborCost);
 
         var result = await _mediator.Send(
-            new GetWorkorderStatsQuery(date),
+            new GetWorkorderStatsQuery(fromUtc, toUtc),
             TestContext.Current.CancellationToken);
 
         Assert.False(result.IsError);

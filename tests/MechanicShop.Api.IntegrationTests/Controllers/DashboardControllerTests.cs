@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Net;
 using System.Net.Http.Json;
 
@@ -29,14 +30,16 @@ public class DashboardControllerTests : IDisposable
 
     public void Dispose() => _scope.Dispose();
 
-[Fact]
+    [Fact]
     public async Task GetDashboardStats_WhenAuthenticated_ShouldReturnRequestedDate()
     {
         await AuthenticateAsManagerAsync();
         var requestedDate = new DateOnly(2026, 11, 3);
+        var fromUtc = new DateTimeOffset(requestedDate.ToDateTime(TimeOnly.MinValue, DateTimeKind.Utc));
+        var toUtc = fromUtc.AddDays(1);
 
         var response = await _client.GetAsync(
-            $"/api/v1.0/dashboard/stats?date={requestedDate:yyyy-MM-dd}",
+            $"/api/v1.0/dashboard/stats?fromUtc={UtcIso(fromUtc)}&toUtc={UtcIso(toUtc)}",
             TestContext.Current.CancellationToken);
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
@@ -48,14 +51,16 @@ public class DashboardControllerTests : IDisposable
         Assert.Equal(requestedDate, result!.Date);
     }
 
-[Fact]
+    [Fact]
     public async Task GetDashboardStats_WhenDateHasNoWorkOrders_ShouldReturnZeroTotals()
     {
         await AuthenticateAsManagerAsync();
         var requestedDate = new DateOnly(2099, 2, 4);
+        var fromUtc = new DateTimeOffset(requestedDate.ToDateTime(TimeOnly.MinValue, DateTimeKind.Utc));
+        var toUtc = fromUtc.AddDays(1);
 
         var response = await _client.GetAsync(
-            $"/api/v1.0/dashboard/stats?date={requestedDate:yyyy-MM-dd}",
+            $"/api/v1.0/dashboard/stats?fromUtc={UtcIso(fromUtc)}&toUtc={UtcIso(toUtc)}",
             TestContext.Current.CancellationToken);
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
@@ -71,7 +76,7 @@ public class DashboardControllerTests : IDisposable
         Assert.Equal(0, result.UniqueCustomers);
     }
 
-[Fact]
+    [Fact]
     public async Task GetDashboardStats_WhenCompletedWorkOrderAndInvoiceExist_ShouldReturnCalculatedTotals()
     {
         await AuthenticateAsManagerAsync();
@@ -110,8 +115,10 @@ public class DashboardControllerTests : IDisposable
             Assert.NotNull(invoice);
             invoiceId = invoice!.InvoiceId;
 
+            var fromUtc = new DateTimeOffset(requestedDate.ToDateTime(TimeOnly.MinValue, DateTimeKind.Utc));
+            var toUtc = fromUtc.AddDays(1);
             var response = await _client.GetAsync(
-                $"/api/v1.0/dashboard/stats?date={requestedDate:yyyy-MM-dd}",
+                $"/api/v1.0/dashboard/stats?fromUtc={UtcIso(fromUtc)}&toUtc={UtcIso(toUtc)}",
                 TestContext.Current.CancellationToken);
             Assert.Equal(HttpStatusCode.OK, response.StatusCode);
             var result = await response.Content.ReadFromJsonAsync<TodayWorkOrderStatsDto>(
@@ -146,6 +153,181 @@ public class DashboardControllerTests : IDisposable
         }
     }
 
+    [Fact]
+    public async Task GetDashboardStats_WhenWorkOrderStartsAtCairoMidnight_ShouldIncludeItInSelectedDate()
+    {
+        await AuthenticateAsManagerAsync();
+        var requestedDate = new DateOnly(2026, 11, 27);
+        var fromUtc = new DateTimeOffset(requestedDate.Year, requestedDate.Month, requestedDate.Day, 0, 0, 0, TimeSpan.FromHours(2));
+        var toUtc = fromUtc.AddDays(1);
+        var repairTask = await _context.RepairTasks.Include(item => item.Parts)
+            .OrderBy(item => item.Id)
+            .FirstAsync(TestContext.Current.CancellationToken);
+        var customer = await _context.Customers.Include(item => item.Vehicles)
+            .OrderBy(item => item.Id)
+            .FirstAsync(TestContext.Current.CancellationToken);
+        var vehicleId = customer.Vehicles.OrderBy(item => item.Id).First().Id;
+        var workOrder = WorkOrderTestDataBuilder.Create()
+            .WithVehicle(vehicleId)
+            .WithLabor(TestUsers.Labor01.Id)
+            .WithTimeSlot(fromUtc, fromUtc.AddMinutes((int)repairTask.EstimatedDurationInMins))
+            .WithRepairTasks(repairTask)
+            .Build();
+
+        _context.WorkOrders.Add(workOrder);
+        await _context.SaveChangesAsync(TestContext.Current.CancellationToken);
+
+        try
+        {
+            var response = await _client.GetAsync(
+                $"/api/v1.0/dashboard/stats?fromUtc={UtcIso(fromUtc)}&toUtc={UtcIso(toUtc)}",
+                TestContext.Current.CancellationToken);
+            Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+            var result = await response.Content.ReadFromJsonAsync<TodayWorkOrderStatsDto>(
+                TestContext.Current.CancellationToken);
+
+            Assert.NotNull(result);
+            Assert.Equal(1, result!.Total);
+            Assert.Equal(1, result.Scheduled);
+        }
+        finally
+        {
+            await _context.WorkOrders.Where(item => item.Id == workOrder.Id)
+                .ExecuteDeleteAsync(TestContext.Current.CancellationToken);
+        }
+    }
+
+    [Fact]
+    public async Task GetDashboardStats_WhenWorkOrderStartsBeforeCairoMidnight_ShouldExcludeItFromSelectedDate()
+    {
+        await AuthenticateAsManagerAsync();
+        var requestedDate = new DateOnly(2026, 11, 27);
+        var fromUtc = new DateTimeOffset(requestedDate.Year, requestedDate.Month, requestedDate.Day, 0, 0, 0, TimeSpan.FromHours(2));
+        var toUtc = fromUtc.AddDays(1);
+        var repairTask = await _context.RepairTasks.Include(item => item.Parts)
+            .OrderBy(item => item.Id)
+            .FirstAsync(TestContext.Current.CancellationToken);
+        var customer = await _context.Customers.Include(item => item.Vehicles)
+            .OrderBy(item => item.Id)
+            .FirstAsync(TestContext.Current.CancellationToken);
+        var vehicleId = customer.Vehicles.OrderBy(item => item.Id).First().Id;
+        var workOrder = WorkOrderTestDataBuilder.Create()
+            .WithVehicle(vehicleId)
+            .WithLabor(TestUsers.Labor01.Id)
+            .WithTimeSlot(fromUtc.AddMinutes(-1), fromUtc.AddMinutes(-1).AddMinutes(30))
+            .WithRepairTasks(repairTask)
+            .Build();
+
+        _context.WorkOrders.Add(workOrder);
+        await _context.SaveChangesAsync(TestContext.Current.CancellationToken);
+
+        try
+        {
+            var response = await _client.GetAsync(
+                $"/api/v1.0/dashboard/stats?fromUtc={UtcIso(fromUtc)}&toUtc={UtcIso(toUtc)}",
+                TestContext.Current.CancellationToken);
+            Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+            var result = await response.Content.ReadFromJsonAsync<TodayWorkOrderStatsDto>(
+                TestContext.Current.CancellationToken);
+
+            Assert.NotNull(result);
+            Assert.Equal(0, result!.Total);
+        }
+        finally
+        {
+            await _context.WorkOrders.Where(item => item.Id == workOrder.Id)
+                .ExecuteDeleteAsync(TestContext.Current.CancellationToken);
+        }
+    }
+
+    [Fact]
+    public async Task GetDashboardStats_WhenWorkOrderStartsAtNextCairoMidnight_ShouldExcludeItFromSelectedDate()
+    {
+        await AuthenticateAsManagerAsync();
+        var requestedDate = new DateOnly(2026, 11, 27);
+        var fromUtc = new DateTimeOffset(requestedDate.Year, requestedDate.Month, requestedDate.Day, 0, 0, 0, TimeSpan.FromHours(2));
+        var toUtc = fromUtc.AddDays(1);
+        var repairTask = await _context.RepairTasks.Include(item => item.Parts)
+            .OrderBy(item => item.Id)
+            .FirstAsync(TestContext.Current.CancellationToken);
+        var customer = await _context.Customers.Include(item => item.Vehicles)
+            .OrderBy(item => item.Id)
+            .FirstAsync(TestContext.Current.CancellationToken);
+        var vehicleId = customer.Vehicles.OrderBy(item => item.Id).First().Id;
+        var workOrder = WorkOrderTestDataBuilder.Create()
+            .WithVehicle(vehicleId)
+            .WithLabor(TestUsers.Labor01.Id)
+            .WithTimeSlot(toUtc, toUtc.AddMinutes(30))
+            .WithRepairTasks(repairTask)
+            .Build();
+
+        _context.WorkOrders.Add(workOrder);
+        await _context.SaveChangesAsync(TestContext.Current.CancellationToken);
+
+        try
+        {
+            var response = await _client.GetAsync(
+                $"/api/v1.0/dashboard/stats?fromUtc={UtcIso(fromUtc)}&toUtc={UtcIso(toUtc)}",
+                TestContext.Current.CancellationToken);
+            Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+            var result = await response.Content.ReadFromJsonAsync<TodayWorkOrderStatsDto>(
+                TestContext.Current.CancellationToken);
+
+            Assert.NotNull(result);
+            Assert.Equal(0, result!.Total);
+        }
+        finally
+        {
+            await _context.WorkOrders.Where(item => item.Id == workOrder.Id)
+                .ExecuteDeleteAsync(TestContext.Current.CancellationToken);
+        }
+    }
+
+    [Fact]
+    public async Task GetDashboardStats_WhenWorkOrderStartsAtCairoMidnightDuringDaylightSavingTime_ShouldIncludeItInSelectedDate()
+    {
+        await AuthenticateAsManagerAsync();
+        var requestedDate = new DateOnly(2026, 7, 15);
+        var fromUtc = new DateTimeOffset(requestedDate.Year, requestedDate.Month, requestedDate.Day, 0, 0, 0, TimeSpan.FromHours(3));
+        var toUtc = fromUtc.AddDays(1);
+        var repairTask = await _context.RepairTasks.Include(item => item.Parts)
+            .OrderBy(item => item.Id)
+            .FirstAsync(TestContext.Current.CancellationToken);
+        var customer = await _context.Customers.Include(item => item.Vehicles)
+            .OrderBy(item => item.Id)
+            .FirstAsync(TestContext.Current.CancellationToken);
+        var vehicleId = customer.Vehicles.OrderBy(item => item.Id).First().Id;
+        var workOrder = WorkOrderTestDataBuilder.Create()
+            .WithVehicle(vehicleId)
+            .WithLabor(TestUsers.Labor01.Id)
+            .WithTimeSlot(fromUtc, fromUtc.AddMinutes(30))
+            .WithRepairTasks(repairTask)
+            .Build();
+
+        _context.WorkOrders.Add(workOrder);
+        await _context.SaveChangesAsync(TestContext.Current.CancellationToken);
+
+        try
+        {
+            var response = await _client.GetAsync(
+                $"/api/v1.0/dashboard/stats?fromUtc={UtcIso(fromUtc)}&toUtc={UtcIso(toUtc)}",
+                TestContext.Current.CancellationToken);
+            Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+            var result = await response.Content.ReadFromJsonAsync<TodayWorkOrderStatsDto>(
+                TestContext.Current.CancellationToken);
+
+            Assert.NotNull(result);
+            Assert.Equal(1, result!.Total);
+        }
+        finally
+        {
+            await _context.WorkOrders.Where(item => item.Id == workOrder.Id)
+                .ExecuteDeleteAsync(TestContext.Current.CancellationToken);
+        }
+    }
+
+    private static string UtcIso(DateTimeOffset value) =>
+        value.UtcDateTime.ToString("yyyy-MM-dd'T'HH:mm:ss", CultureInfo.InvariantCulture) + "Z";
 
     private async Task AuthenticateAsManagerAsync()
     {
